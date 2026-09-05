@@ -1,16 +1,15 @@
-// Single entry point for the `album` Edge Function. Serves all three
-// surfaces' HTML/CSS/JS and the small JSON API that needs server-only
-// secrets (R2 keys, service-role key, token secret). See insphotoPRD.md and
-// the build plan for the full picture.
+// Single entry point for the `album` Edge Function — a pure JSON API.
+//
+// The three surfaces' HTML/CSS/JS are served from Cloudflare Pages instead
+// of from here: Supabase Edge Functions force any text/html GET response
+// down to text/plain with a sandboxed CSP on the shared *.supabase.co
+// domain (a deliberate anti-phishing measure, confirmed against the real
+// deployment — see the note in web/shared/supabase-init.js). This function
+// now only handles routes that need secrets a browser must never see (R2
+// keys, service-role key, token secret). See insphotoPRD.md and the build
+// plan for the full picture.
 
 import { corsPreflight, notFound } from "./lib/respond.ts";
-import {
-  serveAdminPage,
-  serveConsolePage,
-  serveGuestPage,
-  serveLedPage,
-  tryServeAsset,
-} from "./routes/pages.ts";
 import { handlePresign } from "./routes/presign.ts";
 import { handleGuestDelete } from "./routes/media.ts";
 import { handleCreateEvent } from "./routes/admin.ts";
@@ -26,9 +25,8 @@ import {
   handleLogin,
 } from "./routes/host.ts";
 
-// Requests arrive as .../functions/v1/album/<rest> (or, behind a custom
-// domain routing straight at the function, just /<rest>). Normalize to the
-// logical path used by the route table below either way.
+// Requests arrive as .../functions/v1/album/<rest>. Normalize to the
+// logical path used by the route table below.
 function logicalPath(pathname: string): string {
   const marker = "/album";
   const idx = pathname.indexOf(marker);
@@ -45,26 +43,8 @@ Deno.serve(async (req: Request) => {
   const method = req.method;
 
   try {
-    // Static assets first — they share the /e /h /s prefixes with the page routes.
-    const asset = await tryServeAsset(path);
-    if (asset) return asset;
-
-    // Pages
     let m: RegExpMatchArray | null;
-    if (method === "GET" && (m = path.match(/^\/e\/([^/]+)$/))) {
-      return await serveGuestPage(m[1]);
-    }
-    if (method === "GET" && (m = path.match(/^\/h\/([^/]+)$/))) {
-      return await serveConsolePage(m[1]);
-    }
-    if (method === "GET" && (m = path.match(/^\/s\/([^/]+)$/))) {
-      return await serveLedPage(m[1]);
-    }
-    if (method === "GET" && path === "/admin") {
-      return await serveAdminPage();
-    }
 
-    // API
     if (method === "POST" && path === "/api/presign") {
       return await handlePresign(req);
     }

@@ -1,0 +1,9 @@
+# Cloudflare Pages checks for a matching static file first (so /e/app.js,
+# /e/style.css etc. are served as-is) and only falls back to these rewrites
+# when no file matches — which is exactly the /e/:slug, /h/:slug, /s/:slug
+# dynamic-page behavior the app needs. 200 = rewrite (URL stays as typed),
+# not a redirect.
+/e/*      /e/index.html      200
+/h/*      /h/index.html      200
+/s/*      /s/index.html      200
+/admin/*  /admin/index.html  200

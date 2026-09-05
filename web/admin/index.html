@@ -68,11 +68,11 @@
   </div>
 
   <script>
+    // This page is served from Cloudflare Pages; the API is the Supabase
+    // Edge Function on a different origin (see shared/supabase-init.js for
+    // why). CORS on the function already allows this.
     function apiPath(p) {
-      const marker = "/album";
-      const idx = location.pathname.indexOf(marker);
-      const root = idx === -1 ? "" : location.pathname.slice(0, idx + marker.length);
-      return root + p;
+      return "https://pqhstyhtakohvwfjpmmf.supabase.co/functions/v1/album" + p;
     }
 
     document.getElementById("form").addEventListener("submit", async (e) => {
@@ -93,9 +93,10 @@
         });
         const body = await res.json();
         if (!res.ok) throw new Error(body.error || "failed");
-        const guestUrl = `${location.origin}${apiPath("/e/" + body.slug)}`;
-        const hostUrl = `${location.origin}${apiPath("/h/" + body.slug)}`;
-        const ledUrl = `${location.origin}${apiPath("/s/" + body.slug)}`;
+        // These pages live on this same Cloudflare Pages site, unlike the API call above.
+        const guestUrl = `${location.origin}/e/${body.slug}`;
+        const hostUrl = `${location.origin}/h/${body.slug}`;
+        const ledUrl = `${location.origin}/s/${body.slug}`;
         result.className = "ok";
         result.innerHTML = `Created.<br>Guest: <a href="${guestUrl}">${guestUrl}</a><br>Console: <a href="${hostUrl}">${hostUrl}</a><br>LED: <a href="${ledUrl}">${ledUrl}</a>`;
       } catch (err) {

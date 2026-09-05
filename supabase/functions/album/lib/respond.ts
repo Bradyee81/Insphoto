@@ -13,33 +13,6 @@ export function json(body: unknown, init: ResponseInit = {}): Response {
   });
 }
 
-export function html(body: string, init: ResponseInit = {}): Response {
-  return new Response(body, {
-    status: init.status ?? 200,
-    headers: {
-      "content-type": "text/html; charset=utf-8",
-      ...CORS,
-      ...init.headers,
-    },
-  });
-}
-
-export function asset(
-  body: string,
-  contentType: string,
-  init: ResponseInit = {},
-): Response {
-  return new Response(body, {
-    status: init.status ?? 200,
-    headers: {
-      "content-type": contentType,
-      "cache-control": "public, max-age=300",
-      ...CORS,
-      ...init.headers,
-    },
-  });
-}
-
 export function notFound(message = "not found"): Response {
   return json({ error: message }, { status: 404 });
 }

@@ -268,7 +268,9 @@
   // ---------- event setup ----------
 
   function guestUrl() {
-    return `${location.origin}${window.Insphoto.apiPath(`/e/${state.slug}`)}`;
+    // The guest page is on this same Cloudflare Pages site — unlike API
+    // calls, which go to the separate Supabase origin (see apiPath).
+    return `${location.origin}/e/${state.slug}`;
   }
 
   function renderQr() {
