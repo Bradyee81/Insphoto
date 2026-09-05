@@ -11,6 +11,13 @@
 
 * { box-sizing: border-box; }
 
+/* Several elements below (.photo-view, .sheet, .notice) set their own
+   `display` for when they're shown, at the same specificity as the
+   browser's built-in `[hidden] { display: none }` rule — so without this,
+   the later one (ours) wins and the element stays visible even with the
+   `hidden` attribute set. This guarantees `hidden` always wins. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   padding: 0;

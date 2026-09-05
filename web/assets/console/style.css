@@ -9,6 +9,10 @@
   --danger: #dc2626;
 }
 * { box-sizing: border-box; }
+/* .login-screen, .app, .lightbox set their own `display` at the same
+   specificity as the browser's `[hidden] { display: none }` rule, so
+   without this the element stays visible even when `hidden` is set. */
+[hidden] { display: none !important; }
 html, body {
   margin: 0;
   background: var(--bg);
