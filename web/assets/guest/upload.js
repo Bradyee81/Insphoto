@@ -18,14 +18,32 @@
     return m ? m[1].toLowerCase() : fallback;
   }
 
-  function loadImage(file) {
-    return new Promise((resolve, reject) => {
-      if ("createImageBitmap" in window) {
-        createImageBitmap(file).then(resolve).catch(reject);
-      } else {
-        reject(new Error("createImageBitmap unsupported"));
-      }
-    });
+  // Modern phone cameras shoot 12-48MP. Decoding that at full resolution
+  // just to immediately downscale it can spike memory enough to crash the
+  // tab on mobile Safari before the upload ever starts (observed: page
+  // silently reloads back to the default tab, no error, nothing uploaded).
+  // Ask the browser to downsample *during* decode instead — resizeWidth
+  // alone preserves aspect ratio, so this works for portrait or landscape
+  // without needing the original dimensions up front. The cap is set above
+  // our largest final rendition (1920) so quality isn't affected; the exact
+  // per-rendition sizing still happens in resizeToBlob below.
+  const DECODE_CAP = 2200;
+
+  async function loadImage(file) {
+    if (!("createImageBitmap" in window)) {
+      throw new Error("createImageBitmap unsupported");
+    }
+    try {
+      return await createImageBitmap(file, {
+        resizeWidth: DECODE_CAP,
+        resizeQuality: "medium",
+      });
+    } catch {
+      // Some browsers reject the resize options for certain formats —
+      // fall back to a full decode. HEIC decode failures are handled by
+      // the caller's own catch, which falls back to uploading the original.
+      return await createImageBitmap(file);
+    }
   }
 
   async function resizeToBlob(bitmap, maxEdge, quality) {
