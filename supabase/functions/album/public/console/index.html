@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InsPhoto Console</title>
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <h1>InsPhoto Console</h1>
+      <p id="loginEventName" class="muted"></p>
+      <input id="pinInput" type="password" inputmode="numeric" placeholder="Host PIN" maxlength="20" />
+      <button id="loginBtn">Sign in</button>
+      <p id="loginError" class="error" hidden></p>
+    </div>
+  </div>
+
+  <div id="app" class="app" hidden>
+    <header class="cbar">
+      <div class="cbar-left">
+        <h1 id="hEventName">Console</h1>
+        <span id="hStats" class="muted"></span>
+      </div>
+      <nav class="ctabs">
+        <button class="ctab active" data-tab="grid">Live Grid</button>
+        <button class="ctab" data-tab="led">LED Control</button>
+        <button class="ctab" data-tab="setup">Event Setup</button>
+      </nav>
+      <button id="panicBtn" class="panic-btn">⛔ PANIC</button>
+    </header>
+
+    <main>
+      <section id="ctab-grid" class="ctab-panel active">
+        <div id="grid" class="grid"></div>
+      </section>
+
+      <section id="ctab-led" class="ctab-panel">
+        <div class="led-controls">
+          <div class="scene-switch">
+            <button class="scene-btn" data-scene="wall" data-key="1">1 · Live wall</button>
+            <button class="scene-btn" data-scene="ranking" data-key="2">2 · Ranking</button>
+            <button class="scene-btn" data-scene="winner" data-key="3" disabled>3 · Winner reveal (Sprint 2)</button>
+            <button class="scene-btn" data-scene="sponsor" data-key="4" disabled>4 · Sponsor slate (Sprint 3)</button>
+            <button class="scene-btn" data-scene="countdown" data-key="5" disabled>5 · Countdown (Sprint 2)</button>
+            <button class="scene-btn" data-scene="blank" data-key="6">6 · Blank</button>
+          </div>
+          <div class="led-row">
+            <label><input id="holdToggle" type="checkbox" /> Hold all (pause new photos on LED)</label>
+          </div>
+          <div class="led-row">
+            <label for="delayInput">Delay before a photo can appear on the LED (seconds)</label>
+            <input id="delayInput" type="number" min="0" max="600" />
+            <button id="delaySave">Save</button>
+          </div>
+          <p class="muted">Current scene: <strong id="currentScene">—</strong></p>
+        </div>
+      </section>
+
+      <section id="ctab-setup" class="ctab-panel">
+        <div class="setup-grid">
+          <div class="setup-card">
+            <h2>Guest link</h2>
+            <div id="qr" class="qr"></div>
+            <div class="link-row">
+              <input id="guestLink" readonly />
+              <button id="copyLink">Copy</button>
+            </div>
+            <button id="downloadQr">Download QR (900px PNG)</button>
+          </div>
+
+          <div class="setup-card">
+            <h2>Stats</h2>
+            <ul id="statsList" class="stats-list"></ul>
+            <button id="exportZip">Download album (.zip)</button>
+          </div>
+
+          <div class="setup-card">
+            <h2>Toggles</h2>
+            <label><input type="checkbox" id="tUploadOpen" /> Uploads open</label>
+            <label><input type="checkbox" id="tGalleryPublic" /> Gallery public</label>
+            <label><input type="checkbox" id="tModeration" /> Moderation (review before showing)</label>
+            <label><input type="checkbox" id="tAllowVideo" /> Allow video</label>
+            <label><input type="checkbox" id="tAllowGuestDelete" /> Guests can delete their own upload</label>
+          </div>
+
+          <div class="setup-card">
+            <h2>Branding</h2>
+            <label>Event name<input id="fName" type="text" /></label>
+            <label>Tagline<input id="fTagline" type="text" /></label>
+            <label>Host name<input id="fHostName" type="text" /></label>
+            <label>Welcome / PDPA notice<textarea id="fWelcome" rows="3"></textarea></label>
+            <label>Brand color<input id="fBrandColor" type="color" /></label>
+            <label>Accent color<input id="fAccentColor" type="color" /></label>
+            <button id="saveSettings">Save settings</button>
+            <span id="saveStatus" class="muted"></span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="lightbox" class="lightbox" hidden>
+    <button id="lbClose" class="lb-close">✕</button>
+    <div id="lbMedia" class="lb-media"></div>
+    <div class="lb-info">
+      <span id="lbUploader"></span>
+      <span id="lbTime"></span>
+      <span id="lbLikes"></span>
+      <span id="lbStatus"></span>
+    </div>
+    <div class="lb-actions">
+      <button id="lbApprove">Approve</button>
+      <button id="lbHide">Hide</button>
+      <button id="lbFeature">Feature</button>
+      <button id="lbDelete" class="danger">Delete</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="../shared/format.js"></script>
+  <script src="../shared/supabase-init.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

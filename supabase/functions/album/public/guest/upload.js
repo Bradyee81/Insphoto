@@ -1,0 +1,254 @@
+// Upload flow: client-side resize, presign, direct-to-R2 PUT, then a normal
+// insert of the album_media row. PRD §6.4.
+(function () {
+  const MAX_RETRIES = 3;
+  const PRESIGN_SAFETY_MS = 4.5 * 60 * 1000; // re-presign once we're this close to the 5 min expiry
+
+  const state = {
+    event: null,
+  };
+
+  function el(id) {
+    return document.getElementById(id);
+  }
+
+  function extFromType(type, fallback) {
+    if (!type) return fallback;
+    const m = type.match(/\/([a-z0-9]+)$/i);
+    return m ? m[1].toLowerCase() : fallback;
+  }
+
+  function loadImage(file) {
+    return new Promise((resolve, reject) => {
+      if ("createImageBitmap" in window) {
+        createImageBitmap(file).then(resolve).catch(reject);
+      } else {
+        reject(new Error("createImageBitmap unsupported"));
+      }
+    });
+  }
+
+  async function resizeToBlob(bitmap, maxEdge, quality) {
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", quality),
+    );
+    return { blob, width: w, height: h };
+  }
+
+  function xhrPut(url, blob, contentType, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", url);
+      xhr.setRequestHeader("content-type", contentType);
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded / e.total);
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error(`upload failed: ${xhr.status}`));
+      };
+      xhr.onerror = () => reject(new Error("network error during upload"));
+      xhr.send(blob);
+    });
+  }
+
+  async function presign(files) {
+    const res = await fetch(window.Insphoto.apiPath("/api/presign"), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ event_id: state.event.id, files }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "presign failed");
+    return (await res.json()).files; // [{part,key,url,expiresAt}]
+  }
+
+  function sleep(ms) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+
+  function makeItemUI(file) {
+    const li = document.createElement("li");
+    li.className = "upload-item";
+    const thumb = document.createElement("img");
+    if (file.type.startsWith("image/")) {
+      thumb.src = URL.createObjectURL(file);
+    } else {
+      thumb.style.background = "#2a2f36";
+    }
+    const info = document.createElement("div");
+    info.className = "u-info";
+    const name = document.createElement("div");
+    name.className = "u-name";
+    name.textContent = file.name;
+    const bar = document.createElement("div");
+    bar.className = "u-bar";
+    const fill = document.createElement("div");
+    fill.className = "u-bar-fill";
+    bar.appendChild(fill);
+    const status = document.createElement("div");
+    status.className = "u-status";
+    status.textContent = "Preparing…";
+    info.append(name, bar, status);
+    li.append(thumb, info);
+    el("uploadList").prepend(li);
+    return { fill, status };
+  }
+
+  async function putWithRetry(part, blob, contentType, ext, ui, weight, baseProgress) {
+    let attempt = 0;
+    let presigned = null;
+    let presignedAt = 0;
+    while (attempt < MAX_RETRIES) {
+      attempt++;
+      try {
+        if (!presigned || Date.now() - presignedAt > PRESIGN_SAFETY_MS) {
+          const files = await presign([{ part, content_type: contentType, ext }]);
+          presigned = files[0];
+          presignedAt = Date.now();
+        }
+        await xhrPut(presigned.url, blob, contentType, (p) => {
+          ui.fill.style.width = `${Math.round((baseProgress + p * weight) * 100)}%`;
+        });
+        return presigned.key;
+      } catch (e) {
+        if (attempt >= MAX_RETRIES) throw e;
+        await sleep(2 ** (attempt - 1) * 1000);
+        presigned = null; // force a fresh presign on retry
+      }
+    }
+    throw new Error("upload failed");
+  }
+
+  async function processImage(file, ui) {
+    let bitmap;
+    try {
+      bitmap = await loadImage(file);
+    } catch {
+      // HEIC or otherwise undecodable — fall back to uploading the original.
+      const key = await putWithRetry(
+        "display",
+        file,
+        file.type || "application/octet-stream",
+        extFromType(file.type, "jpg"),
+        ui,
+        1,
+        0,
+      );
+      return { storage_path: key, thumb_path: null, width: null, height: null, bytes: file.size };
+    }
+
+    const maxPx = state.event.max_photo_px || 1920;
+    const quality = state.event.jpeg_quality || 0.8;
+    const display = await resizeToBlob(bitmap, maxPx, quality);
+    const thumb = await resizeToBlob(bitmap, 480, 0.72);
+
+    const displayKey = await putWithRetry("display", display.blob, "image/jpeg", "jpg", ui, 0.75, 0);
+    const thumbKey = await putWithRetry("thumb", thumb.blob, "image/jpeg", "jpg", ui, 0.25, 0.75);
+
+    return {
+      storage_path: displayKey,
+      thumb_path: thumbKey,
+      width: display.width,
+      height: display.height,
+      bytes: display.blob.size,
+    };
+  }
+
+  async function processVideo(file, ui) {
+    const key = await putWithRetry(
+      "video",
+      file,
+      file.type || "video/mp4",
+      extFromType(file.type, "mp4"),
+      ui,
+      1,
+      0,
+    );
+    return { storage_path: key, thumb_path: null, width: null, height: null, bytes: file.size };
+  }
+
+  async function handleFile(file) {
+    const ui = makeItemUI(file);
+    const isVideo = file.type.startsWith("video/");
+
+    if (isVideo && !state.event.allow_video) {
+      ui.status.textContent = "Videos aren't enabled for this event";
+      ui.status.classList.add("error");
+      return;
+    }
+    const maxBytes = (state.event.max_file_mb || 25) * 1024 * 1024;
+    if (file.size > maxBytes) {
+      ui.status.textContent = `Too large — max ${state.event.max_file_mb}MB`;
+      ui.status.classList.add("error");
+      return;
+    }
+
+    ui.status.textContent = "Uploading…";
+    try {
+      const result = isVideo ? await processVideo(file, ui) : await processImage(file, ui);
+      const { error } = await window.Insphoto.supabase.from("album_media").insert({
+        event_id: state.event.id,
+        storage_path: result.storage_path,
+        thumb_path: result.thumb_path,
+        kind: isVideo ? "video" : "photo",
+        width: result.width,
+        height: result.height,
+        bytes: result.bytes,
+        uploader_name: window.InsphotoDevice.guestName(),
+        device_id: window.InsphotoDevice.deviceId(),
+      });
+      if (error) throw error;
+      ui.fill.style.width = "100%";
+      ui.status.textContent = "Done";
+      ui.status.classList.add("done");
+    } catch (e) {
+      console.error(e);
+      ui.status.textContent = "Failed — tap Gallery/Camera to retry";
+      ui.status.classList.add("error");
+    }
+  }
+
+  function handleFiles(fileList) {
+    Array.from(fileList).forEach(handleFile);
+  }
+
+  function initNameField() {
+    const input = el("nameInput");
+    input.value = window.InsphotoDevice.guestName();
+    el("nameSave").addEventListener("click", () => {
+      window.InsphotoDevice.guestName(input.value.trim());
+      window.InsphotoApp.toast("Name saved");
+    });
+  }
+
+  function init(event) {
+    state.event = event;
+    initNameField();
+    el("cameraInput").addEventListener("change", (e) => {
+      handleFiles(e.target.files);
+      e.target.value = "";
+    });
+    el("galleryInput").addEventListener("change", (e) => {
+      handleFiles(e.target.files);
+      e.target.value = "";
+    });
+    if (!event.upload_open) {
+      document.querySelector(".upload-actions").hidden = true;
+      const p = document.createElement("p");
+      p.textContent = "Uploads are closed for this event right now.";
+      p.style.padding = "0 8px";
+      p.style.color = "var(--text-dim)";
+      el("panel-upload").prepend(p);
+    }
+  }
+
+  window.InsphotoUpload = { init };
+})();

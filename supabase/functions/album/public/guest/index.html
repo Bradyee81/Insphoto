@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>InsPhoto</title>
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="notice" class="notice" hidden>
+    <p id="noticeText"></p>
+    <button id="noticeOk">Got it</button>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">
+      <img id="logo" class="logo" hidden />
+      <div>
+        <h1 id="eventName">InsPhoto</h1>
+        <p id="eventTagline" class="tagline"></p>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="explore">Explore</button>
+    <button class="tab" data-tab="upload">Upload</button>
+    <button class="tab" data-tab="ranking">Ranking</button>
+  </nav>
+
+  <main>
+    <section id="panel-explore" class="panel active">
+      <div id="feedEmpty" class="empty" hidden>
+        <p>No photos yet — be the first to add one.</p>
+        <button id="emptyUploadBtn">Add a photo</button>
+      </div>
+      <div id="feedGrid" class="masonry"></div>
+      <div id="feedSentinel" class="sentinel"></div>
+    </section>
+
+    <section id="panel-upload" class="panel">
+      <div id="nameRow" class="name-row">
+        <label>Your name (optional)</label>
+        <div class="name-inputs">
+          <input id="nameInput" type="text" placeholder="Stay anonymous" maxlength="40" />
+          <button id="nameSave">Save</button>
+        </div>
+      </div>
+      <div class="upload-actions">
+        <label class="upload-btn">
+          📷 Camera
+          <input id="cameraInput" type="file" accept="image/*,video/*" capture="environment" hidden />
+        </label>
+        <label class="upload-btn">
+          🖼️ Gallery
+          <input id="galleryInput" type="file" accept="image/*,video/*" multiple hidden />
+        </label>
+      </div>
+      <ul id="uploadList" class="upload-list"></ul>
+    </section>
+
+    <section id="panel-ranking" class="panel">
+      <div id="rankingGrid" class="masonry"></div>
+    </section>
+  </main>
+
+  <div id="photoView" class="photo-view" hidden>
+    <button id="pvClose" class="pv-close" aria-label="Close">✕</button>
+    <div class="pv-stage">
+      <button id="pvPrev" class="pv-nav pv-prev" aria-label="Previous">‹</button>
+      <div id="pvMediaWrap" class="pv-media-wrap"></div>
+      <button id="pvNext" class="pv-nav pv-next" aria-label="Next">›</button>
+    </div>
+    <div class="pv-info">
+      <div class="pv-meta">
+        <span id="pvUploader"></span>
+        <span id="pvCaption"></span>
+      </div>
+      <div class="pv-actions">
+        <button id="pvLike" class="pv-like">❤️ 0 · 0 people</button>
+        <button id="pvShare">Share</button>
+        <button id="pvMore">⋯</button>
+        <button id="pvDelete" hidden>Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="downloadSheet" class="sheet" hidden>
+    <div class="sheet-body">
+      <button id="dlStandard">Standard (1920px)</button>
+      <button id="dlHigh">High quality (original)</button>
+      <button id="dlCancel">Cancel</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="../shared/format.js"></script>
+  <script src="../shared/device.js"></script>
+  <script src="../shared/supabase-init.js"></script>
+  <script src="./feed.js"></script>
+  <script src="./photoview.js"></script>
+  <script src="./ranking.js"></script>
+  <script src="./upload.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

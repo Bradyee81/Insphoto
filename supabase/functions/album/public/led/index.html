@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InsPhoto LED</title>
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="scene-wall" class="scene active">
+    <div id="wallBackdrop" class="wall-backdrop"></div>
+    <img id="wallImg" class="wall-img" />
+    <video id="wallVideo" class="wall-img" muted playsinline hidden></video>
+    <div id="justAdded" class="just-added" hidden>Just added</div>
+    <div class="wall-caption">
+      <div id="wallUploader" class="wall-uploader"></div>
+      <div id="wallCaption" class="wall-caption-text"></div>
+    </div>
+  </div>
+
+  <div id="scene-ranking" class="scene">
+    <h1 class="ranking-title">Ranking</h1>
+    <div id="rankingGrid" class="ranking-grid"></div>
+  </div>
+
+  <div id="scene-blank" class="scene blank"></div>
+
+  <div id="scene-placeholder" class="scene placeholder">
+    <p id="placeholderText"></p>
+  </div>
+
+  <div id="joinCard" class="join-card">
+    <div id="joinQr" class="join-qr"></div>
+    <span>Scan to join</span>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="../shared/format.js"></script>
+  <script src="../shared/supabase-init.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

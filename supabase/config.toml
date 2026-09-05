@@ -1,0 +1,4 @@
+project_id = "insphoto"
+
+[functions.album]
+verify_jwt = false
