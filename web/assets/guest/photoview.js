@@ -268,7 +268,11 @@
     el.dlHigh.addEventListener("click", () => {
       closeDownloadSheet();
       if (state.media) {
-        triggerDownload(window.Insphoto.mediaUrl(state.media.storage_path), "photo-highres.jpg");
+        // original_path is the true, unresized upload; null for rows from
+        // before this existed, or the rare HEIC-decode-failure path where
+        // storage_path already *is* the original — either way, fall back.
+        const key = state.media.original_path || state.media.storage_path;
+        triggerDownload(window.Insphoto.mediaUrl(key), "photo-original.jpg");
       }
     });
 

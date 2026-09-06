@@ -20,7 +20,7 @@ export async function handleGuestDelete(req: Request, mediaId: string): Promise<
   const admin = supabaseAdmin();
   const { data: media, error } = await admin
     .from("album_media")
-    .select("id, device_id, storage_path, thumb_path, event_id, album_events!inner(allow_guest_delete)")
+    .select("id, device_id, storage_path, thumb_path, original_path, event_id, album_events!inner(allow_guest_delete)")
     .eq("id", mediaId)
     .single();
 
@@ -30,7 +30,7 @@ export async function handleGuestDelete(req: Request, mediaId: string): Promise<
   const allowGuestDelete = (media as any).album_events?.allow_guest_delete;
   if (!allowGuestDelete) return badRequest("guest delete is disabled for this event");
 
-  await remove([media.storage_path, media.thumb_path]);
+  await remove([media.storage_path, media.thumb_path, media.original_path]);
   const { error: delErr } = await admin.from("album_media").delete().eq("id", mediaId);
   if (delErr) return json({ error: delErr.message }, { status: 500 });
 

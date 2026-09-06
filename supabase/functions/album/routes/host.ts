@@ -83,7 +83,7 @@ export async function handleHostMediaDelete(
   const media = await loadMediaForEvent(mediaId, auth.event_id);
   if (!media) return notFound("photo not found");
 
-  await remove([media.storage_path, media.thumb_path]);
+  await remove([media.storage_path, media.thumb_path, media.original_path]);
   const { error } = await supabaseAdmin().from("album_media").delete().eq("id", mediaId);
   if (error) return json({ error: error.message }, { status: 500 });
   return json({ ok: true });
@@ -234,7 +234,7 @@ export async function handleHostExport(req: Request, slug: string): Promise<Resp
 
   const { data: rows, error } = await supabaseAdmin()
     .from("album_media")
-    .select("id, storage_path, kind, status")
+    .select("id, storage_path, original_path, kind, status")
     .eq("event_id", auth.event_id)
     .neq("status", "hidden");
 
@@ -243,7 +243,10 @@ export async function handleHostExport(req: Request, slug: string): Promise<Resp
   const zip = new ZipBuilder();
   let index = 1;
   for (const row of rows ?? []) {
-    const bytes = await getObject(row.storage_path);
+    // Prefer the true original when we have one — this bulk export is the
+    // main reason a host would want it. Falls back to the display rendition
+    // for older rows or the HEIC-decode-failure path (see migration 0002).
+    const bytes = await getObject(row.original_path || row.storage_path);
     if (!bytes) continue;
     const ext = row.kind === "video" ? "mp4" : "jpg";
     zip.addFile(`${String(index).padStart(4, "0")}.${ext}`, bytes);

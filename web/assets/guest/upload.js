@@ -150,7 +150,10 @@
     try {
       bitmap = await loadImage(file);
     } catch {
-      // HEIC or otherwise undecodable — fall back to uploading the original.
+      // HEIC or otherwise undecodable — fall back to uploading the original
+      // as-is. It's already the true original, so there's no separate
+      // "original" upload to do here (original_path stays null; the
+      // download button falls back to storage_path for exactly this case).
       const key = await putWithRetry(
         "display",
         file,
@@ -160,7 +163,14 @@
         1,
         0,
       );
-      return { storage_path: key, thumb_path: null, width: null, height: null, bytes: file.size };
+      return {
+        storage_path: key,
+        thumb_path: null,
+        original_path: null,
+        width: null,
+        height: null,
+        bytes: file.size,
+      };
     }
 
     const maxPx = state.event.max_photo_px || 1920;
@@ -168,15 +178,32 @@
     const display = await resizeToBlob(bitmap, maxPx, quality);
     const thumb = await resizeToBlob(bitmap, 480, 0.72);
 
-    const displayKey = await putWithRetry("display", display.blob, "image/jpeg", "jpg", ui, 0.75, 0);
-    const thumbKey = await putWithRetry("thumb", thumb.blob, "image/jpeg", "jpg", ui, 0.25, 0.75);
+    // Thumb and display stay exactly as before (fast/cheap for the live
+    // feed, photo view, LED). The true original is uploaded untouched
+    // alongside them, purely so guests can get their actual photo back via
+    // the "High quality" download — nothing else in the app reads it.
+    const thumbKey = await putWithRetry("thumb", thumb.blob, "image/jpeg", "jpg", ui, 0.15, 0);
+    const displayKey = await putWithRetry("display", display.blob, "image/jpeg", "jpg", ui, 0.35, 0.15);
+    const originalKey = await putWithRetry(
+      "original",
+      file,
+      file.type || "application/octet-stream",
+      extFromType(file.type, "jpg"),
+      ui,
+      0.5,
+      0.5,
+    );
 
     return {
       storage_path: displayKey,
       thumb_path: thumbKey,
+      original_path: originalKey,
       width: display.width,
       height: display.height,
-      bytes: display.blob.size,
+      // Total bytes actually stored across all three renditions — the
+      // console's "storage used" stat sums this column, and would badly
+      // understate usage now that the (often much larger) original is kept.
+      bytes: thumb.blob.size + display.blob.size + file.size,
     };
   }
 
@@ -190,7 +217,16 @@
       1,
       0,
     );
-    return { storage_path: key, thumb_path: null, width: null, height: null, bytes: file.size };
+    // Video is already uploaded untouched (no resize pass), so storage_path
+    // already *is* the original — no separate "original" upload needed.
+    return {
+      storage_path: key,
+      thumb_path: null,
+      original_path: null,
+      width: null,
+      height: null,
+      bytes: file.size,
+    };
   }
 
   async function handleFile(file) {
@@ -216,6 +252,7 @@
         event_id: state.event.id,
         storage_path: result.storage_path,
         thumb_path: result.thumb_path,
+        original_path: result.original_path,
         kind: isVideo ? "video" : "photo",
         width: result.width,
         height: result.height,
@@ -250,6 +287,12 @@
   function init(event) {
     state.event = event;
     initNameField();
+    if (!event.allow_video) {
+      // Restrict the native picker to images up front, rather than letting
+      // a guest pick a video and only then telling them it's not allowed.
+      el("cameraInput").setAttribute("accept", "image/*");
+      el("galleryInput").setAttribute("accept", "image/*");
+    }
     el("cameraInput").addEventListener("change", (e) => {
       handleFiles(e.target.files);
       e.target.value = "";

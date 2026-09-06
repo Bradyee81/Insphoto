@@ -7,7 +7,7 @@ import { supabaseAdmin } from "../lib/supabaseAdmin.ts";
 import { makeKey, presignPut } from "../lib/r2.ts";
 
 interface FileReq {
-  part: "display" | "thumb" | "video";
+  part: "display" | "thumb" | "video" | "original";
   content_type: string;
   ext: string;
 }
@@ -37,7 +37,7 @@ export async function handlePresign(req: Request): Promise<Response> {
 
   const out: { part: string; key: string; url: string; expiresAt: number }[] = [];
   for (const f of files) {
-    if (!["display", "thumb", "video"].includes(f.part)) {
+    if (!["display", "thumb", "video", "original"].includes(f.part)) {
       return badRequest(`invalid part: ${f.part}`);
     }
     if (f.part === "video" && !event.allow_video) {
