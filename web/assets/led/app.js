@@ -329,11 +329,23 @@
     if (error || !event) return; // silent — no dialog, just stays blank
 
     state.event = event;
-    renderJoinCard();
+    // The join-card QR is a nice-to-have; the photo wall is the whole
+    // point. An uncaught throw here (e.g. the QR library failing to load)
+    // must never take the wall down with it — wrap every non-essential
+    // step so a failure in one can't silently cancel everything after it.
+    try {
+      renderJoinCard();
+    } catch (e) {
+      console.error("join card failed", e);
+    }
     await loadInitialMedia();
     applyScene();
     subscribe();
-    requestWakeLock();
+    try {
+      requestWakeLock();
+    } catch (e) {
+      console.error("wake lock failed", e);
+    }
 
     state.eligibilityTimer = setInterval(recomputeEligibility, ELIGIBILITY_CHECK_MS);
   }

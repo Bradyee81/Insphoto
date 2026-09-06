@@ -389,7 +389,11 @@
     document.querySelectorAll(".ctab-panel").forEach((p) => p.classList.remove("active"));
     document.getElementById(`ctab-${name}`).classList.add("active");
     if (name === "setup") {
-      renderQr();
+      try {
+        renderQr();
+      } catch (e) {
+        console.error("QR render failed", e);
+      }
       refreshStats();
     }
   }
