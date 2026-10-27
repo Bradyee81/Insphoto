@@ -178,32 +178,19 @@
     const display = await resizeToBlob(bitmap, maxPx, quality);
     const thumb = await resizeToBlob(bitmap, 480, 0.72);
 
-    // Thumb and display stay exactly as before (fast/cheap for the live
-    // feed, photo view, LED). The true original is uploaded untouched
-    // alongside them, purely so guests can get their actual photo back via
-    // the "High quality" download — nothing else in the app reads it.
-    const thumbKey = await putWithRetry("thumb", thumb.blob, "image/jpeg", "jpg", ui, 0.15, 0);
-    const displayKey = await putWithRetry("display", display.blob, "image/jpeg", "jpg", ui, 0.35, 0.15);
-    const originalKey = await putWithRetry(
-      "original",
-      file,
-      file.type || "application/octet-stream",
-      extFromType(file.type, "jpg"),
-      ui,
-      0.5,
-      0.5,
-    );
+    // Guests only need a copy good enough to view: the 1920px display and
+    // the 480px thumb. Full-resolution originals are kept for photographer
+    // uploads only (see /p/), which keeps guest uploads fast and storage small.
+    const thumbKey = await putWithRetry("thumb", thumb.blob, "image/jpeg", "jpg", ui, 0.3, 0);
+    const displayKey = await putWithRetry("display", display.blob, "image/jpeg", "jpg", ui, 0.7, 0.3);
 
     return {
       storage_path: displayKey,
       thumb_path: thumbKey,
-      original_path: originalKey,
+      original_path: null,
       width: display.width,
       height: display.height,
-      // Total bytes actually stored across all three renditions — the
-      // console's "storage used" stat sums this column, and would badly
-      // understate usage now that the (often much larger) original is kept.
-      bytes: thumb.blob.size + display.blob.size + file.size,
+      bytes: thumb.blob.size + display.blob.size,
     };
   }
 

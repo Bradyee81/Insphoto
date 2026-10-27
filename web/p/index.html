@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>InsPhoto Photographer Upload</title>
+<link rel="stylesheet" href="../assets/photog/style.css" />
+</head>
+<body>
+  <div id="loginScreen" class="login">
+    <div class="card">
+      <h1>📷 Photographer upload</h1>
+      <p id="loginEvent" class="muted"></p>
+      <input id="pinInput" type="password" inputmode="numeric" placeholder="Photographer PIN" maxlength="20" />
+      <button id="loginBtn">Sign in</button>
+      <p id="loginError" class="error" hidden></p>
+    </div>
+  </div>
+
+  <div id="app" hidden>
+    <header class="bar">
+      <div>
+        <h1 id="eventName">Photographer upload</h1>
+        <p class="muted">Uploads go straight into the event album. JPEG or PNG — no RAW.</p>
+      </div>
+      <label class="name">Credit as
+        <input id="creditInput" type="text" maxlength="40" placeholder="Photographer" />
+      </label>
+    </header>
+
+    <main>
+      <label id="drop" class="drop">
+        <input id="fileInput" type="file" accept="image/jpeg,image/png" multiple hidden />
+        <strong>Drop photos here</strong>
+        <span>or click to choose files — select a whole folder's photos at once</span>
+      </label>
+
+      <section class="summary">
+        <div class="stat"><b id="sQueued">0</b><span>waiting</span></div>
+        <div class="stat"><b id="sShown">0</b><span>in album</span></div>
+        <div class="stat"><b id="sOriginals">0</b><span>full-quality saved</span></div>
+        <div class="stat bad"><b id="sFailed">0</b><span>failed</span></div>
+        <button id="retryBtn" hidden>Retry failed</button>
+      </section>
+      <div class="overall"><div id="overallFill" class="overall-fill"></div></div>
+      <p id="hint" class="muted">Keep this tab open until "waiting" reaches 0 and every photo says Done.</p>
+
+      <ul id="list" class="list"></ul>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
+  <script src="../assets/shared/supabase-init.js"></script>
+  <script src="../assets/photog/app.js"></script>
+</body>
+</html>

@@ -87,28 +87,37 @@
 
   function startTimer() {
     clearInterval(state.timer);
-    state.timer = setInterval(refresh, REFRESH_MS);
+    state.timer = setInterval(() => {
+      if (state.active) refresh();
+    }, REFRESH_MS);
   }
 
-  function setupRealtime() {
-    window.Insphoto.supabase
-      .channel(`ranking:${state.event.id}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "album_media", filter: `event_id=eq.${state.event.id}` },
-        () => refresh(),
-      )
-      .on(
-        "postgres_changes",
-        { event: "DELETE", schema: "public", table: "album_media", filter: `event_id=eq.${state.event.id}` },
-        () => refresh(),
-      )
-      .subscribe();
+  // Called by the feed's realtime channel on every photo change. Every like
+  // by anyone is a change, so with a few hundred phones this must not turn
+  // into a query per like per phone: refresh only while the tab is open,
+  // and at most once every few seconds.
+  const CHANGE_THROTTLE_MS = 5000;
+  let lastChangeRefresh = 0;
+  let changeTimer = null;
+  function onMediaChanged() {
+    if (!state.active) return;
+    const wait = lastChangeRefresh + CHANGE_THROTTLE_MS - Date.now();
+    if (wait <= 0) {
+      lastChangeRefresh = Date.now();
+      refresh();
+    } else if (!changeTimer) {
+      changeTimer = setTimeout(() => {
+        changeTimer = null;
+        lastChangeRefresh = Date.now();
+        refresh();
+      }, wait);
+    }
   }
 
   function onShow() {
     state.active = true;
     render();
+    refresh();
   }
   function onHide() {
     state.active = false;
@@ -118,7 +127,6 @@
     state.event = event;
     refresh();
     startTimer();
-    setupRealtime();
 
     let resizeTimer;
     window.addEventListener("resize", () => {
@@ -129,5 +137,5 @@
     });
   }
 
-  window.InsphotoRanking = { init, onShow, onHide };
+  window.InsphotoRanking = { init, onShow, onHide, onMediaChanged };
 })();

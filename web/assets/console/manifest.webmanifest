@@ -1,0 +1,14 @@
+{
+  "name": "InsPhoto Console",
+  "short_name": "InsPhoto",
+  "description": "Run the photo wall, moderation and Best Dress contest for an InsPhoto event.",
+  "start_url": "/h/",
+  "scope": "/h/",
+  "display": "standalone",
+  "background_color": "#0b0d10",
+  "theme_color": "#0F766E",
+  "icons": [
+    { "src": "/assets/console/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/assets/console/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

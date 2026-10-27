@@ -329,3 +329,146 @@ main { padding: 0 8px 90px; }
   main { max-width: 960px; margin: 0 auto; }
   .topbar, .tabs { max-width: 960px; margin: 0 auto; width: 100%; }
 }
+
+/* Pinned "Featured" row at the top of Explore — scrolls with the page. */
+.featured-strip { padding: 6px 0 10px; }
+.featured-strip h2 {
+  font-size: 15px;
+  margin: 4px 12px 8px;
+  color: var(--accent);
+}
+.featured-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 12px 4px;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
+}
+.featured-row::-webkit-scrollbar { display: none; }
+.f-tile {
+  flex: 0 0 auto;
+  width: 118px;
+  height: 150px;
+  padding: 0;
+  border: 2px solid var(--accent);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface);
+  scroll-snap-align: start;
+}
+.f-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Best Dress final vote */
+.vote-pill {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 40;
+  border: 0;
+  border-radius: 999px;
+  padding: 14px 26px;
+  font-size: 17px;
+  font-weight: 800;
+  color: #1a1200;
+  background: var(--accent);
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  animation: pill-pulse 1.2s ease-in-out infinite;
+}
+.vote-view {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.vote-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(12px + env(safe-area-inset-top)) 14px 10px;
+  background: var(--surface);
+}
+.vote-head h2 { margin: 0; font-size: 20px; color: var(--accent); flex: 1; }
+.vote-timer {
+  font-size: 26px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.vote-timer.urgent { color: #ef4444; }
+.vote-close {
+  border: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 999px;
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+}
+.vote-msg { padding: 10px 14px 0; color: var(--text-dim); font-size: 14px; }
+.vote-grid {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 12px calc(20px + env(safe-area-inset-bottom));
+}
+.v-card {
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+  aspect-ratio: 3 / 4;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.v-card img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.v-card .v-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0,0,0,.65);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.v-card .v-heart {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  font-size: 30px;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.6));
+}
+.v-card .v-mine {
+  position: absolute;
+  left: 8px;
+  bottom: 10px;
+  color: #fff;
+  font-weight: 800;
+  font-size: 15px;
+  text-shadow: 0 1px 6px rgba(0,0,0,.8);
+}
+.v-card.tapped .v-heart { animation: heart-pop .25s ease; }
+.vote-view.closed .v-card { opacity: .6; }
+.v-burst {
+  position: absolute;
+  font-size: 26px;
+  pointer-events: none;
+  animation: burst .7s ease-out forwards;
+}
+@keyframes burst {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(.8); }
+  to { opacity: 0; transform: translate(-50%, -160%) scale(1.4); }
+}
+@keyframes pill-pulse {
+  50% { transform: translateX(-50%) scale(1.07); }
+}

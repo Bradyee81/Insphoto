@@ -4,7 +4,11 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>InsPhoto Console</title>
-<link rel="stylesheet" href="../assets/console/style.css" />
+<meta name="theme-color" content="#0F766E" />
+<link rel="manifest" href="/assets/console/manifest.webmanifest" />
+<link rel="icon" href="/assets/console/icon-192.png" />
+<link rel="apple-touch-icon" href="/assets/console/icon-192.png" />
+<link rel="stylesheet" href="/assets/console/style.css" />
 </head>
 <body>
   <div id="loginScreen" class="login-screen">
@@ -25,34 +29,96 @@
       </div>
       <nav class="ctabs">
         <button class="ctab active" data-tab="grid">Live Grid</button>
+        <button class="ctab" data-tab="contest">Best Dress</button>
         <button class="ctab" data-tab="led">LED Control</button>
         <button class="ctab" data-tab="setup">Event Setup</button>
       </nav>
+      <span id="screenNow" class="screen-now"></span>
+      <button id="openScreenBtn" class="screen-btn" hidden title="Show the LED screen full screen on the second display">🖥 Open screen</button>
       <button id="panicBtn" class="panic-btn">⛔ PANIC</button>
     </header>
 
     <main>
       <section id="ctab-grid" class="ctab-panel active">
+        <div class="filters">
+          <button class="filter active" data-filter="all">All</button>
+          <button class="filter" data-filter="photographer">📷 Photographer</button>
+          <button class="filter" data-filter="guest">Guests</button>
+          <button class="filter" data-filter="featured">★ Featured</button>
+          <span class="muted">★ = show on the LED wall (when "featured only" is on) · 📺 = put on screen now</span>
+        </div>
         <div id="grid" class="grid"></div>
+      </section>
+
+      <section id="ctab-contest" class="ctab-panel">
+        <div class="contest">
+          <div class="contest-bar">
+            <div>
+              <h2>Best Dress</h2>
+              <p id="cPhase" class="phase-pill"></p>
+            </div>
+            <div class="contest-actions" id="cActions"></div>
+          </div>
+          <p id="cHelp" class="muted"></p>
+
+          <div class="contest-cols">
+            <div class="contest-col">
+              <h3 id="cRankTitle">Round 1 — most people liked</h3>
+              <ol id="cRanking" class="c-list"></ol>
+            </div>
+            <div class="contest-col">
+              <h3>Contestants on stage <span id="cCount" class="muted"></span></h3>
+              <ol id="cContestants" class="c-list"></ol>
+              <div id="cVoteBox" class="vote-box">
+                <label>Countdown
+                  <select id="cSeconds">
+                    <option value="0">No timer — stop by hand</option>
+                    <option value="30">30 seconds</option>
+                    <option value="60" selected>60 seconds</option>
+                    <option value="90">90 seconds</option>
+                    <option value="120">2 minutes</option>
+                    <option value="180">3 minutes</option>
+                  </select>
+                </label>
+              </div>
+              <div id="cLive" class="c-live"></div>
+            </div>
+          </div>
+          <div class="contest-foot">
+            <button id="cLog">Download vote log (CSV)</button>
+            <button id="cReset" class="ghost">Reset contest (rehearsal only)</button>
+          </div>
+        </div>
       </section>
 
       <section id="ctab-led" class="ctab-panel">
         <div class="led-controls">
           <div class="scene-switch">
-            <button class="scene-btn" data-scene="wall" data-key="1">1 · Live wall</button>
-            <button class="scene-btn" data-scene="ranking" data-key="2">2 · Ranking</button>
-            <button class="scene-btn" data-scene="winner" data-key="3" disabled>3 · Winner reveal (Sprint 2)</button>
-            <button class="scene-btn" data-scene="sponsor" data-key="4" disabled>4 · Sponsor slate (Sprint 3)</button>
-            <button class="scene-btn" data-scene="countdown" data-key="5" disabled>5 · Countdown (Sprint 2)</button>
+            <button class="scene-btn" data-scene="wall" data-key="1">1 · Photo wall</button>
+            <button class="scene-btn" data-scene="ranking" data-key="2">2 · Ranking (top 9 photos)</button>
+            <button class="scene-btn" data-scene="contest" data-key="3">3 · Best Dress (contestants + numbers)</button>
+            <button class="scene-btn" data-scene="spotlight" data-key="4">4 · One photo (last one sent with 📺)</button>
             <button class="scene-btn" data-scene="blank" data-key="6">6 · Blank</button>
           </div>
-          <div class="led-row">
-            <label><input id="holdToggle" type="checkbox" /> Hold all (pause new photos on LED)</label>
+          <div id="appScreenRow" class="led-row" hidden>
+            <button id="openScreenBtn2">🖥 Open screen on second display</button>
+            <button id="closeScreenBtn" class="ghost">Close screen window</button>
           </div>
           <div class="led-row">
-            <label for="delayInput">Delay before a photo can appear on the LED (seconds)</label>
+            <label><input id="featuredOnlyToggle" type="checkbox" /> <b>Featured only</b> — the wall shows only photos you ★ (no delay)</label>
+          </div>
+          <div class="led-row">
+            <label><input id="holdToggle" type="checkbox" /> Hold all (keep showing what's up, add nothing new)</label>
+          </div>
+          <div class="led-row">
+            <label for="delayInput">Delay before a guest photo can appear on the wall (seconds)</label>
             <input id="delayInput" type="number" min="0" max="600" />
             <button id="delaySave">Save</button>
+          </div>
+          <div id="spotPreview" class="spot-preview" hidden>
+            <p class="muted">On screen now (📺):</p>
+            <img id="spotPreviewImg" />
+            <button id="spotBack">Back to photo wall</button>
           </div>
           <p class="muted">Current scene: <strong id="currentScene">—</strong></p>
         </div>
@@ -71,9 +137,23 @@
           </div>
 
           <div class="setup-card">
+            <h2>Photographer</h2>
+            <div class="link-row">
+              <input id="photogLink" readonly />
+              <button id="copyPhotogLink">Copy</button>
+            </div>
+            <label>Photographer PIN (different from yours)
+              <input id="photogPin" type="text" maxlength="20" placeholder="at least 4 characters" />
+            </label>
+            <button id="savePhotogPin">Set photographer PIN</button>
+          </div>
+
+          <div class="setup-card">
             <h2>Stats</h2>
             <ul id="statsList" class="stats-list"></ul>
-            <button id="exportZip">Download album (.zip)</button>
+            <label><input type="checkbox" id="tOriginals" /> <b>Allow full-quality downloads</b> (turn on after the event)</label>
+            <button id="exportAll">Download all photos to a folder</button>
+            <p id="exportStatus" class="muted"></p>
           </div>
 
           <div class="setup-card">
@@ -111,19 +191,21 @@
       <span id="lbStatus"></span>
     </div>
     <div class="lb-actions">
+      <button id="lbSpot" class="primary">📺 Show on screen now</button>
+      <button id="lbFeature">★ Feature</button>
       <button id="lbApprove">Approve</button>
       <button id="lbHide">Hide</button>
-      <button id="lbFeature">Feature</button>
       <button id="lbDelete" class="danger">Delete</button>
     </div>
   </div>
 
   <div id="toast" class="toast" hidden></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
   <script src="../assets/shared/format.js"></script>
   <script src="../assets/shared/supabase-init.js"></script>
   <script src="../assets/console/app.js"></script>
+  <script src="../assets/console/contest.js"></script>
 </body>
 </html>

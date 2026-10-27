@@ -26,3 +26,15 @@ export async function sendBroadcast(
     console.error(`broadcast failed: ${res.status} ${await res.text()}`);
   }
 }
+
+// A photo left the public album (deleted, or hidden by the host). Neither
+// transition reaches anon subscribers through postgres_changes — DELETE
+// events can't be filtered by event_id, and a row that stops passing the
+// anon SELECT policy produces no event — so tell the guest feed and the LED
+// directly, on the exact channel names they subscribe to.
+export async function notifyMediaRemoved(eventId: string, mediaId: string): Promise<void> {
+  await Promise.all([
+    sendBroadcast(`feed:${eventId}`, "media_removed", { id: mediaId }),
+    sendBroadcast(`led:${eventId}`, "media_removed", { id: mediaId }),
+  ]);
+}

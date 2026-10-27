@@ -30,6 +30,10 @@
 
   <main>
     <section id="panel-explore" class="panel active">
+      <div id="featuredStrip" class="featured-strip" hidden>
+        <h2>⭐ Featured</h2>
+        <div id="featuredRow" class="featured-row"></div>
+      </div>
       <div id="feedEmpty" class="empty" hidden>
         <p>No photos yet — be the first to add one.</p>
         <button id="emptyUploadBtn">Add a photo</button>
@@ -93,9 +97,21 @@
     </div>
   </div>
 
+  <button id="votePill" class="vote-pill" hidden>❤️ Best Dress — vote now</button>
+
+  <div id="voteView" class="vote-view" hidden>
+    <header class="vote-head">
+      <h2>Best Dress</h2>
+      <span id="voteTimer" class="vote-timer"></span>
+      <button id="voteClose" class="vote-close" aria-label="Close">✕</button>
+    </header>
+    <p id="voteMsg" class="vote-msg"></p>
+    <div id="voteGrid" class="vote-grid"></div>
+  </div>
+
   <div id="toast" class="toast" hidden></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
   <script src="../assets/shared/format.js"></script>
   <script src="../assets/shared/device.js"></script>
   <script src="../assets/shared/supabase-init.js"></script>
@@ -103,6 +119,7 @@
   <script src="../assets/guest/photoview.js"></script>
   <script src="../assets/guest/ranking.js"></script>
   <script src="../assets/guest/upload.js"></script>
+  <script src="../assets/guest/vote.js"></script>
   <script src="../assets/guest/app.js"></script>
 </body>
 </html>

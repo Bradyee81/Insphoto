@@ -85,6 +85,7 @@
     window.InsphotoRanking.init(event);
     window.InsphotoPhotoView.init(event);
     window.InsphotoUpload.init(event);
+    window.InsphotoVote.init(event);
 
     // Keep branding/toggles live if the host changes them mid-event.
     window.Insphoto.supabase
@@ -92,7 +93,10 @@
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "album_events", filter: `id=eq.${event.id}` },
-        (payload) => applyBranding(payload.new),
+        (payload) => {
+          applyBranding(payload.new);
+          window.InsphotoPhotoView.setEvent(payload.new);
+        },
       )
       .subscribe();
   }

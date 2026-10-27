@@ -1,17 +1,19 @@
 // Everything the console (PRD §7) needs that requires the service role:
-// login, the polled live-feed, moderation actions, settings, stats and the
-// ZIP export. Every route except login requires a valid host token (§12).
+// login, the polled live-feed, moderation actions, settings, stats, the
+// export list and the photographer PIN. Every route except login requires
+// a valid host token (§12).
 
 import { badRequest, json, notFound, unauthorized } from "../lib/respond.ts";
 import { supabaseAdmin } from "../lib/supabaseAdmin.ts";
-import { bearerToken, mintToken, verifyPin, verifyToken } from "../lib/hostAuth.ts";
-import { getObject, remove } from "../lib/r2.ts";
-import { sendBroadcast } from "../lib/broadcast.ts";
-import { ZipBuilder } from "../lib/zip.ts";
+import { bearerToken, hashPin, mintToken, verifyPin, verifyToken } from "../lib/hostAuth.ts";
+import { publicUrl, remove } from "../lib/r2.ts";
+import { notifyMediaRemoved } from "../lib/broadcast.ts";
 
-async function requireHost(req: Request, slug: string) {
+export async function requireHost(req: Request, slug: string) {
   const token = bearerToken(req);
   const payload = await verifyToken(token, slug);
+  // A photographer token must never reach the console routes.
+  if (!payload || payload.role === "photog") return null;
   return payload; // null if invalid/expired/slug mismatch
 }
 
@@ -43,23 +45,55 @@ export async function handleLogin(req: Request): Promise<Response> {
   const ok = await verifyPin(pin, secret.pin_hash);
   if (!ok) return unauthorized("wrong pin");
 
-  const token = await mintToken({ event_id: event.id, slug: event.slug });
+  const token = await mintToken({ event_id: event.id, slug: event.slug, role: "host" });
   return json({ token, event });
 }
 
+const FEED_PAGE = 1000;
+
+// Full load: every row, newest first, paged past PostgREST's row cap.
+// ?since=<iso>: only rows changed after that moment (new uploads, likes,
+// hide/feature/approve) — what the console polls every few seconds.
 export async function handleFeed(req: Request, slug: string): Promise<Response> {
   const auth = await requireHost(req, slug);
   if (!auth) return unauthorized();
 
-  const { data, error } = await supabaseAdmin()
-    .from("album_media")
-    .select("*")
-    .eq("event_id", auth.event_id)
-    .order("created_at", { ascending: false })
-    .limit(500);
+  const since = new URL(req.url).searchParams.get("since");
+  const admin = supabaseAdmin();
+  const rows: Record<string, unknown>[] = [];
 
-  if (error) return json({ error: error.message }, { status: 500 });
-  return json({ media: data });
+  if (since) {
+    const { data, error } = await admin
+      .from("album_media")
+      .select("*")
+      .eq("event_id", auth.event_id)
+      .gt("updated_at", since)
+      .order("updated_at", { ascending: true })
+      .limit(FEED_PAGE);
+    if (error) return json({ error: error.message }, { status: 500 });
+    rows.push(...(data ?? []));
+  } else {
+    for (let from = 0; ; from += FEED_PAGE) {
+      const { data, error } = await admin
+        .from("album_media")
+        .select("*")
+        .eq("event_id", auth.event_id)
+        .order("created_at", { ascending: false })
+        .range(from, from + FEED_PAGE - 1);
+      if (error) return json({ error: error.message }, { status: 500 });
+      rows.push(...(data ?? []));
+      if (!data || data.length < FEED_PAGE) break;
+    }
+  }
+
+  // The cursor for the next ?since= poll is the newest updated_at we have
+  // seen, taken from the database's own clock rather than the browser's.
+  let cursor = since;
+  for (const r of rows) {
+    const u = r.updated_at as string;
+    if (!cursor || u > cursor) cursor = u;
+  }
+  return json({ media: rows, cursor, full: !since });
 }
 
 async function loadMediaForEvent(mediaId: string, eventId: string) {
@@ -86,6 +120,7 @@ export async function handleHostMediaDelete(
   await remove([media.storage_path, media.thumb_path, media.original_path]);
   const { error } = await supabaseAdmin().from("album_media").delete().eq("id", mediaId);
   if (error) return json({ error: error.message }, { status: 500 });
+  await notifyMediaRemoved(auth.event_id, mediaId);
   return json({ ok: true });
 }
 
@@ -105,8 +140,7 @@ export async function handleHostMediaHide(
     .eq("id", mediaId);
   if (error) return json({ error: error.message }, { status: 500 });
 
-  // postgres_changes won't reach anon subscribers for this transition — see plan.
-  await sendBroadcast(`event:${auth.event_id}`, "media_hidden", { id: mediaId });
+  await notifyMediaRemoved(auth.event_id, mediaId);
   return json({ ok: true });
 }
 
@@ -147,6 +181,7 @@ export async function handleHostMediaFeature(
 }
 
 const SETTINGS_FIELDS = [
+  "name",
   "tagline",
   "host_name",
   "brand_color",
@@ -165,6 +200,9 @@ const SETTINGS_FIELDS = [
   "led_delay_seconds",
   "led_scene",
   "led_hold",
+  "led_featured_only",
+  "led_spotlight_media",
+  "originals_download",
 ] as const;
 
 export async function handleHostSettings(req: Request, slug: string): Promise<Response> {
@@ -199,67 +237,66 @@ export async function handleHostStats(req: Request, slug: string): Promise<Respo
   const auth = await requireHost(req, slug);
   if (!auth) return unauthorized();
 
-  const admin = supabaseAdmin();
-  const { count: total } = await admin
-    .from("album_media")
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", auth.event_id);
-  const { count: pending } = await admin
-    .from("album_media")
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", auth.event_id)
-    .eq("status", "pending");
-  const { data: rows } = await admin
-    .from("album_media")
-    .select("bytes, device_id")
-    .eq("event_id", auth.event_id);
-
-  const bytesTotal = (rows ?? []).reduce(
-    (n: number, r: { bytes: number | null }) => n + (r.bytes ?? 0),
-    0,
-  );
-  const contributors = new Set((rows ?? []).map((r: { device_id: string }) => r.device_id)).size;
-
+  // Aggregated in SQL so the totals stay right past PostgREST's row cap.
+  const { data, error } = await supabaseAdmin().rpc("album_event_stats", { p_event: auth.event_id });
+  if (error) return json({ error: error.message }, { status: 500 });
+  const s = (data ?? [])[0] ?? {};
   return json({
-    photos: total ?? 0,
-    pending: pending ?? 0,
-    contributors,
-    bytes: bytesTotal,
+    photos: s.photos ?? 0,
+    pending: s.pending ?? 0,
+    photographer: s.photographer ?? 0,
+    contributors: s.contributors ?? 0,
+    bytes: s.bytes ?? 0,
   });
 }
 
-export async function handleHostExport(req: Request, slug: string): Promise<Response> {
+// The list of every photo's best file (the original when there is one), for
+// the console to download one by one straight into a folder on the host's
+// computer. This replaced a server-built ZIP: a few GB of originals doesn't
+// fit in an Edge Function's memory or time limit, a browser writing
+// file-by-file has no limit.
+export async function handleHostExportList(req: Request, slug: string): Promise<Response> {
   const auth = await requireHost(req, slug);
   if (!auth) return unauthorized();
 
-  const { data: rows, error } = await supabaseAdmin()
-    .from("album_media")
-    .select("id, storage_path, original_path, kind, status")
-    .eq("event_id", auth.event_id)
-    .neq("status", "hidden");
-
-  if (error) return json({ error: error.message }, { status: 500 });
-
-  const zip = new ZipBuilder();
-  let index = 1;
-  for (const row of rows ?? []) {
-    // Prefer the true original when we have one — this bulk export is the
-    // main reason a host would want it. Falls back to the display rendition
-    // for older rows or the HEIC-decode-failure path (see migration 0002).
-    const bytes = await getObject(row.original_path || row.storage_path);
-    if (!bytes) continue;
-    const ext = row.kind === "video" ? "mp4" : "jpg";
-    zip.addFile(`${String(index).padStart(4, "0")}.${ext}`, bytes);
-    index++;
+  const admin = supabaseAdmin();
+  const files: { url: string; name: string }[] = [];
+  for (let from = 0; ; from += FEED_PAGE) {
+    const { data, error } = await admin
+      .from("album_media")
+      .select("id, storage_path, original_path, kind, source, created_at")
+      .eq("event_id", auth.event_id)
+      .neq("status", "hidden")
+      .order("created_at", { ascending: true })
+      .range(from, from + FEED_PAGE - 1);
+    if (error) return json({ error: error.message }, { status: 500 });
+    for (const row of data ?? []) {
+      const key = row.original_path || row.storage_path;
+      const ext = (key.match(/\.([a-z0-9]+)$/i)?.[1] ?? (row.kind === "video" ? "mp4" : "jpg")).toLowerCase();
+      const n = String(files.length + 1).padStart(4, "0");
+      const who = row.source === "photographer" ? "photographer" : "guest";
+      files.push({ url: publicUrl(key)!, name: `${n}-${who}.${ext}` });
+    }
+    if (!data || data.length < FEED_PAGE) break;
   }
+  return json({ files });
+}
 
-  const body = zip.build();
-  return new Response(body, {
-    status: 200,
-    headers: {
-      "content-type": "application/zip",
-      "content-disposition": `attachment; filename="${slug}-album.zip"`,
-      "access-control-allow-origin": "*",
-    },
-  });
+export async function handleSetPhotogPin(req: Request, slug: string): Promise<Response> {
+  const auth = await requireHost(req, slug);
+  if (!auth) return unauthorized();
+  let body: { pin?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return badRequest("invalid json");
+  }
+  const pin = (body.pin ?? "").trim();
+  if (pin.length < 4) return badRequest("pin must be at least 4 characters");
+  const { error } = await supabaseAdmin()
+    .from("album_event_secrets")
+    .update({ photog_pin_hash: await hashPin(pin) })
+    .eq("event_id", auth.event_id);
+  if (error) return json({ error: error.message }, { status: 500 });
+  return json({ ok: true });
 }

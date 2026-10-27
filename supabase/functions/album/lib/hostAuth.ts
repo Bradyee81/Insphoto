@@ -80,6 +80,9 @@ async function hmacKey(secret: string): Promise<CryptoKey> {
 export interface HostTokenPayload {
   event_id: string;
   slug: string;
+  // "photog" tokens can only upload. Tokens minted before roles existed
+  // carry no role and are host tokens.
+  role?: "host" | "photog";
   exp: number; // epoch ms
 }
 

@@ -213,6 +213,9 @@
   }
 
   function openDownloadSheet() {
+    // Full-quality originals stay locked until the host unlocks them after
+    // the event; on the night, only the screen-quality copy downloads.
+    el.dlHigh.hidden = !(state.event && state.event.originals_download);
     el.sheet.hidden = false;
   }
   function closeDownloadSheet() {
@@ -267,7 +270,7 @@
     });
     el.dlHigh.addEventListener("click", () => {
       closeDownloadSheet();
-      if (state.media) {
+      if (state.media && state.event && state.event.originals_download) {
         // original_path is the true, unresized upload; null for rows from
         // before this existed, or the rare HEIC-decode-failure path where
         // storage_path already *is* the original — either way, fall back.
@@ -321,5 +324,9 @@
     bindEvents();
   }
 
-  window.InsphotoPhotoView = { init, open, close };
+  function setEvent(event) {
+    state.event = event;
+  }
+
+  window.InsphotoPhotoView = { init, open, close, setEvent };
 })();

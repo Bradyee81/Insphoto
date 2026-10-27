@@ -6,6 +6,7 @@
 import { badRequest, json, notFound } from "../lib/respond.ts";
 import { supabaseAdmin } from "../lib/supabaseAdmin.ts";
 import { remove } from "../lib/r2.ts";
+import { notifyMediaRemoved } from "../lib/broadcast.ts";
 
 export async function handleGuestDelete(req: Request, mediaId: string): Promise<Response> {
   let body: { device_id?: string };
@@ -33,6 +34,7 @@ export async function handleGuestDelete(req: Request, mediaId: string): Promise<
   await remove([media.storage_path, media.thumb_path, media.original_path]);
   const { error: delErr } = await admin.from("album_media").delete().eq("id", mediaId);
   if (delErr) return json({ error: delErr.message }, { status: 500 });
+  await notifyMediaRemoved(media.event_id, mediaId);
 
   return json({ ok: true });
 }

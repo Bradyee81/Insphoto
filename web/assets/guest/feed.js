@@ -99,6 +99,7 @@
   }
 
   function removeMedia(id) {
+    setFeatured({ id, featured: false });
     const el = document.querySelector(`#feedGrid .tile[data-id="${id}"]`);
     if (!el) return;
     el.classList.add("removing");
@@ -107,6 +108,63 @@
     const idx = state.list.indexOf(id);
     if (idx !== -1) state.list.splice(idx, 1);
     updateEmptyState();
+  }
+
+  // ---------- pinned "Featured" row ----------
+  // A horizontal strip at the top of Explore that scrolls away with the
+  // page (not sticky). Thumbnails only; tapping opens the full photo.
+
+  const featured = new Map(); // id -> row, newest first by insertion
+
+  function renderFeatured() {
+    const strip = document.getElementById("featuredStrip");
+    const row = document.getElementById("featuredRow");
+    strip.hidden = featured.size === 0;
+    row.innerHTML = "";
+    const ids = [...featured.keys()];
+    for (const m of featured.values()) {
+      const btn = document.createElement("button");
+      btn.className = "f-tile";
+      const img = document.createElement("img");
+      img.src = window.Insphoto.mediaUrl(m.thumb_path || m.storage_path);
+      img.alt = m.caption || "";
+      img.loading = "lazy";
+      btn.appendChild(img);
+      btn.addEventListener("click", () => window.InsphotoPhotoView.open(m.id, ids));
+      row.appendChild(btn);
+    }
+  }
+
+  function setFeatured(m) {
+    const had = featured.has(m.id);
+    if (m.featured && m.status !== "hidden") {
+      if (had) {
+        featured.set(m.id, m);
+        return;
+      }
+      // Newly featured goes to the front.
+      const next = new Map([[m.id, m], ...featured]);
+      featured.clear();
+      for (const [k, v] of next) featured.set(k, v);
+      renderFeatured();
+    } else if (had) {
+      featured.delete(m.id);
+      renderFeatured();
+    }
+  }
+
+  async function loadFeatured() {
+    const { data, error } = await window.Insphoto.supabase
+      .from("album_media")
+      .select("*")
+      .eq("event_id", state.event.id)
+      .eq("featured", true)
+      .order("updated_at", { ascending: false })
+      .limit(60);
+    if (error) return console.error(error);
+    featured.clear();
+    for (const m of data || []) featured.set(m.id, m);
+    renderFeatured();
   }
 
   function updateEmptyState() {
@@ -170,20 +228,22 @@
       )
       .on(
         "postgres_changes",
-        { event: "DELETE", schema: "public", table: "album_media", filter: `event_id=eq.${state.event.id}` },
-        (payload) => removeMedia(payload.old.id),
-      )
-      .on(
-        "postgres_changes",
         { event: "UPDATE", schema: "public", table: "album_media", filter: `event_id=eq.${state.event.id}` },
         (payload) => {
           // Covers approve (pending -> approved becoming visible for the first time).
           if (!state.seen.has(payload.new.id) && payload.new.status === "approved") {
             appendMedia([payload.new], { prepend: true });
           }
+          setFeatured(payload.new);
+          window.InsphotoRanking.onMediaChanged();
         },
       )
-      .on("broadcast", { event: "media_hidden" }, (msg) => removeMedia(msg.payload.id))
+      // Deletes and hides arrive as broadcasts from the Edge Function:
+      // postgres_changes can't deliver either one to an anon subscriber.
+      .on("broadcast", { event: "media_removed" }, (msg) => {
+        removeMedia(msg.payload.id);
+        window.InsphotoRanking.onMediaChanged();
+      })
       .subscribe();
   }
 
@@ -196,6 +256,7 @@
     buildColumns();
     setupInfiniteScroll();
     setupRealtime();
+    loadFeatured();
     loadMore();
 
     let resizeTimer;
