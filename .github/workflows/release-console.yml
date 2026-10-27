@@ -1,0 +1,54 @@
+# Builds the InsPhoto Console Windows installer and publishes it as a
+# GitHub Release, the same way Lucky Draw ships.
+#
+# To ship a new version: bump "version" in console-app/package.json (and
+# console-app/src-tauri/Cargo.toml), commit, push, then push a tag like
+# console-v0.2.0 — or run this workflow from the Actions tab.
+#
+# The app loads the live console from Cloudflare Pages, so most console
+# changes need no new release; only changes under console-app/ do.
+name: Release console app
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["console-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: console-app/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: console-app/src-tauri -> target
+
+      - run: npm ci
+        working-directory: console-app
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: console-app
+          tagName: console-v__VERSION__
+          releaseName: InsPhoto Console v__VERSION__
+          releaseBody: |
+            Windows installer for the InsPhoto Console.
+
+            Download **InsPhoto Console_x.y.z_x64-setup.exe** below and run it — it installs for your user only, no admin rights needed.
+            On first launch, type your event code, then sign in with your host PIN. Press 🖥 Open screen to put the LED screen on the second display.
+          releaseDraft: false
+          prerelease: false
