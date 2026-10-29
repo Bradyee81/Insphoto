@@ -1,0 +1,236 @@
+<!doctype html>
+<!-- Lucky Draw prize collection page: /w/<code>. The prize desk enters the
+     PIN set in the Lucky Draw app, then sees every winner live and ticks off
+     prizes handed out. Talks only to the `luckydraw` Edge Function. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Prize Collection</title>
+<style>
+  :root { --bg:#10141F; --card:#1A2030; --line:#2A3246; --text:#F3F4F6; --dim:#9AA3B5; --gold:#F5C518; --green:#7CD992; --red:#E27676; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  [hidden] { display:none !important; }
+  #gate { max-width:360px; margin:15vh auto 0; padding:0 16px; text-align:center; }
+  #gate h1 { font-size:22px; margin:0 0 6px; }
+  #gate p { color:var(--dim); margin:0 0 18px; }
+  #pin { width:100%; padding:14px; font-size:28px; letter-spacing:8px; text-align:center; border-radius:10px; border:1px solid var(--line); background:var(--card); color:var(--text); outline:none; }
+  #pin:focus { border-color:var(--gold); }
+  #enter { width:100%; margin-top:12px; padding:14px; font-size:17px; font-weight:700; border:0; border-radius:10px; background:var(--gold); color:#10141F; }
+  #gate-error { color:var(--red); min-height:22px; margin-top:12px; }
+  header { position:sticky; top:0; z-index:1; background:var(--bg); border-bottom:1px solid var(--line); padding:12px 16px 10px; }
+  h1.title { margin:0; font-size:20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  #live { font-size:12px; font-weight:600; padding:2px 8px; border-radius:999px; background:#1E3A2A; color:var(--green); }
+  #live.off { background:#3A1E22; color:var(--red); }
+  #stats { color:var(--dim); font-size:14px; margin-top:2px; }
+  #search { width:100%; margin-top:10px; padding:10px 12px; font-size:16px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--text); outline:none; }
+  #search:focus { border-color:var(--gold); }
+  .chips { display:flex; gap:6px; margin-top:8px; overflow-x:auto; padding-bottom:2px; }
+  .chip { flex:none; padding:6px 12px; border-radius:999px; border:1px solid var(--line); background:none; color:var(--dim); font-size:14px; }
+  .chip.on { background:var(--gold); border-color:var(--gold); color:#10141F; font-weight:600; }
+  main { padding:10px 16px 40px; }
+  .card { display:flex; align-items:center; gap:12px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+  .card.new { animation:flash 3s ease-out; }
+  @keyframes flash { from { border-color:var(--gold); box-shadow:0 0 0 2px var(--gold); } to { border-color:var(--line); box-shadow:none; } }
+  .card.done { opacity:.5; }
+  .num { flex:none; min-width:64px; font:700 24px/1 ui-monospace, Consolas, monospace; color:var(--gold); text-align:center; }
+  .info { flex:1; min-width:0; }
+  .name { font-weight:600; font-size:17px; overflow-wrap:anywhere; }
+  .prize { font-size:14px; margin-top:2px; overflow-wrap:anywhere; }
+  .tag { display:inline-block; font-size:11px; font-weight:700; color:var(--gold); border:1px solid rgba(245,197,24,.45); border-radius:4px; padding:0 4px; margin-right:6px; }
+  .meta { color:var(--dim); font-size:12px; margin-top:2px; }
+  .btn { flex:none; min-width:96px; padding:10px 8px; border-radius:8px; font-size:14px; font-weight:600; border:1px solid var(--gold); background:var(--gold); color:#10141F; }
+  .card.done .btn { background:none; border-color:var(--green); color:var(--green); }
+  .empty { color:var(--dim); text-align:center; padding:40px 0; }
+  #lock { background:none; border:1px solid var(--line); color:var(--dim); border-radius:6px; font-size:12px; padding:2px 8px; margin-left:auto; }
+</style>
+</head>
+<body>
+<section id="gate">
+  <h1>Prize Collection</h1>
+  <p>Enter the PIN from the Lucky Draw console.</p>
+  <form id="gate-form">
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN">
+    <button id="enter" type="submit">Open</button>
+  </form>
+  <div id="gate-error"></div>
+</section>
+
+<div id="app" hidden>
+  <header>
+    <h1 class="title"><span id="room-name">Prize Collection</span> <span id="live">Live</span>
+      <button id="lock" type="button">Lock</button></h1>
+    <div id="stats"></div>
+    <input id="search" type="search" inputmode="search" placeholder="Search number or name" autocomplete="off">
+    <div class="chips" id="status-chips">
+      <button class="chip on" data-status="todo">To collect</button>
+      <button class="chip" data-status="done">Collected</button>
+      <button class="chip" data-status="all">All</button>
+    </div>
+    <div class="chips" id="section-chips"></div>
+  </header>
+  <main id="list"></main>
+</div>
+
+<script>
+  const API = "https://pqhstyhtakohvwfjpmmf.supabase.co/functions/v1/luckydraw";
+  const POLL_MS = 3000;
+  const code = (location.pathname.match(/\/w\/([a-z0-9]+)/i) || [])[1]?.toLowerCase() || "";
+  const PIN_KEY = "luckydraw-pin-" + code;
+
+  let pin = "";
+  let winners = [];
+  let seen = null;           // uids already shown, to flash new winners
+  let status = "todo";
+  let section = "";
+  let timer = null;
+  // Taps not yet confirmed by the server, so the card doesn't flicker back.
+  const pending = new Map();
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+  const isCollected = (w) => pending.has(w.uid) ? pending.get(w.uid) : !!w.collected_at;
+  const time = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+
+  async function call(route, body) {
+    const res = await fetch(API + route, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code, pin, ...body }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw Object.assign(new Error(data.error || "Request failed"), { status: res.status });
+    return data;
+  }
+
+  function showGate(message) {
+    clearInterval(timer);
+    $("app").hidden = true;
+    $("gate").hidden = false;
+    $("gate-error").textContent = message || "";
+    $("pin").value = "";
+    $("pin").focus();
+  }
+
+  async function poll() {
+    try {
+      const data = await call("/list", {});
+      $("room-name").textContent = data.name || "Prize Collection";
+      document.title = (data.name || "Prize") + " · Collection";
+      winners = data.winners || [];
+      for (const w of winners) if (pending.get(w.uid) === !!w.collected_at) pending.delete(w.uid);
+      const stale = data.synced_at && Date.now() - new Date(data.synced_at).getTime() > 30000;
+      $("live").textContent = stale ? "Console offline" : "Live";
+      $("live").className = stale ? "off" : "";
+      render();
+      return true;
+    } catch (err) {
+      if (err.status === 401 || err.status === 404 || err.status === 423) {
+        localStorage.removeItem(PIN_KEY);
+        showGate(err.message);
+        return false;
+      }
+      $("live").textContent = "No connection";
+      $("live").className = "off";
+      return true;
+    }
+  }
+
+  async function start(p) {
+    pin = p;
+    if (!(await poll())) return;
+    localStorage.setItem(PIN_KEY, pin);
+    $("gate").hidden = true;
+    $("app").hidden = false;
+    clearInterval(timer);
+    timer = setInterval(poll, POLL_MS);
+  }
+
+  function render() {
+    const done = winners.filter(isCollected).length;
+    $("stats").textContent = `${done} of ${winners.length} prize${winners.length === 1 ? "" : "s"} collected`;
+
+    const sections = [...new Set(winners.map((w) => w.section))];
+    $("section-chips").innerHTML = sections.length < 2 ? "" :
+      [["", "All draws"], ...sections.map((s) => [s, s])]
+        .map(([v, label]) => `<button class="chip${v === section ? " on" : ""}" data-section="${esc(v)}">${esc(label)}</button>`).join("");
+
+    const q = $("search").value.trim().toLowerCase();
+    const shown = winners.filter((w) =>
+      (status === "all" || (status === "done") === isCollected(w)) &&
+      (!section || w.section === section) &&
+      (!q || w.number.toLowerCase().includes(q) || w.name.toLowerCase().includes(q)));
+
+    const fresh = seen ? winners.filter((w) => !seen.has(w.uid)).map((w) => w.uid) : [];
+    seen = new Set(winners.map((w) => w.uid));
+
+    $("list").innerHTML = shown.length === 0
+      ? `<div class="empty">${winners.length === 0 ? "No winners drawn yet." : "Nothing here."}</div>`
+      : shown.map((w) => `
+        <div class="card${isCollected(w) ? " done" : ""}${fresh.includes(w.uid) ? " new" : ""}">
+          <div class="num">${esc(w.number)}</div>
+          <div class="info">
+            <div class="name">${esc(w.name || "—")}</div>
+            <div class="prize">${w.draw_group ? `<span class="tag">${esc(w.draw_group)}</span>` : ""}${esc(w.prize || "—")}</div>
+            <div class="meta">${esc(w.section)}${w.drawn_at ? " · " + esc(time(w.drawn_at)) : ""}${w.collected_at ? " · collected " + esc(time(w.collected_at)) : ""}</div>
+          </div>
+          <button class="btn" data-uid="${esc(w.uid)}">${isCollected(w) ? "✓ Collected" : "Collected"}</button>
+        </div>`).join("");
+  }
+
+  async function toggle(uid) {
+    const w = winners.find((x) => x.uid === uid);
+    if (!w) return;
+    const next = !isCollected(w);
+    if (!next && !confirm(`Mark ${w.number} ${w.name} as NOT collected?`)) return;
+    pending.set(uid, next);
+    render();
+    try {
+      await call("/collect", { uid, collected: next });
+    } catch (err) {
+      pending.delete(uid);
+      alert("Couldn't save that: " + err.message);
+      render();
+    }
+  }
+
+  $("gate-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const p = $("pin").value.trim();
+    if (p) start(p);
+  });
+  $("lock").addEventListener("click", () => {
+    localStorage.removeItem(PIN_KEY);
+    pin = "";
+    showGate("");
+  });
+  $("list").addEventListener("click", (e) => {
+    const btn = e.target.closest(".btn");
+    if (btn) toggle(btn.dataset.uid);
+  });
+  $("status-chips").addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    status = chip.dataset.status;
+    for (const c of $("status-chips").children) c.classList.toggle("on", c === chip);
+    render();
+  });
+  $("section-chips").addEventListener("click", (e) => {
+    const chip = e.target.closest(".chip");
+    if (!chip) return;
+    section = chip.dataset.section;
+    render();
+  });
+  $("search").addEventListener("input", render);
+
+  if (!code) {
+    $("gate").innerHTML = "<h1>Prize Collection</h1><p>Open the link from the Lucky Draw console.</p>";
+  } else {
+    const saved = localStorage.getItem(PIN_KEY);
+    if (saved) start(saved); else $("pin").focus();
+  }
+</script>
+</body>
+</html>

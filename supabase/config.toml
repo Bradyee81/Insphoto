@@ -2,3 +2,6 @@ project_id = "insphoto"
 
 [functions.album]
 verify_jwt = false
+
+[functions.luckydraw]
+verify_jwt = false
