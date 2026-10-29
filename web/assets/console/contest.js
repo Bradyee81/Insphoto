@@ -250,17 +250,25 @@
     }
     if (p === "nominating" || p === "nominations_closed") {
       box.appendChild(
-        button(`Start final vote (${n} contestants)`, async () => {
+        button(`Step 1 · Open final vote (${n} contestants)`, async () => {
           if (n === 0) return C().toast("Pick at least one contestant first");
-          const secs = parseInt($("cSeconds").value, 10) || 0;
           const msg =
-            `Start the final vote now?\n\n• The screen switches to the ${n} contestants\n` +
-            `• Every phone opens the vote\n• Counting starts from zero\n` +
-            `• ${secs ? `It closes by itself after ${secs} seconds` : "It stays open until you press STOP"}\n` +
-            `• Once started, the console cannot change any numbers`;
+            `Open the final vote now?\n\n• The screen switches to the ${n} contestants\n` +
+            `• Every phone opens the vote — guests can start liking\n• Counting starts from zero\n` +
+            `• No timer yet: press "Start countdown" when the emcee announces it\n` +
+            `• Once open, the console cannot change any numbers`;
           if (!confirm(msg)) return;
-          const ok = await act("start_voting", { seconds: secs }, "Final vote is open");
+          const ok = await act("start_voting", { seconds: 0 }, "Final vote is open");
           if (ok) C().setScene("contest");
+        }, "big"),
+      );
+    }
+    if (p === "voting" && !s.data.contest.voting_ends_at) {
+      box.appendChild(
+        button("Step 2 · ⏱ Start countdown", () => {
+          const secs = parseInt($("cSeconds").value, 10);
+          if (!confirm(`Start the ${secs}-second countdown?\n\nLikes keep counting until it hits zero, then voting locks. It can't be restarted.`)) return;
+          act("start_countdown", { seconds: secs }, `Countdown started — ${secs}s`);
         }, "big"),
       );
     }
@@ -275,7 +283,7 @@
       box.appendChild(button("Show result on screen", () => C().setScene("contest"), "big"));
       box.appendChild(button("Back to photo wall", () => C().setScene("wall")));
     }
-    $("cVoteBox").hidden = !(p === "nominating" || p === "nominations_closed");
+    $("cVoteBox").hidden = !(p === "voting" && !s.data.contest.voting_ends_at);
     $("cReset").hidden = p === "voting";
   }
 
@@ -287,7 +295,6 @@
     if (p === "voting" && c.voting_ends_at) {
       const left = Math.max(0, Math.ceil((new Date(c.voting_ends_at).getTime() - serverNow()) / 1000));
       text += ` — ${left}s left`;
-      if (left === 0) load();
     }
     el.textContent = text;
     el.className = "phase-pill " + (p || "");
@@ -308,7 +315,9 @@
         : p === "nominations_closed"
           ? "The ranking is frozen. Name the contestants (shown on screen), then start the final vote."
           : p === "voting"
-            ? "Watching only — numbers cannot be changed from the console while voting is open."
+            ? s.data.contest.voting_ends_at
+              ? "Countdown running — voting locks at zero. Numbers cannot be changed from the console."
+              : "Guests are liking. When the emcee announces it, pick the countdown and press Step 2. Numbers cannot be changed from the console."
             : "Voting is over. Download the log for the record.";
     // Don't rebuild the lists while the operator is typing a label.
     if (!s.editingLabel) {

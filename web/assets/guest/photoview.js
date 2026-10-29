@@ -15,6 +15,7 @@
     swipeStartX: null,
     swipeStartY: null,
     longPressTimer: null,
+    shareFile: null, // { id, file } prepared before the Share tap
   };
 
   const el = {};
@@ -138,6 +139,7 @@
     state.media = data;
     state.pendingLikes = 0;
     renderMedia();
+    prepareShareFile(data);
   }
 
   async function open(id, contextList) {
@@ -170,33 +172,56 @@
     }
   }
 
+  // no-store: the <img> already cached this file without CORS headers, and
+  // reusing that copy makes fetch() fail. A fresh copy comes from the CDN.
   async function fetchBlob(url) {
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error("download failed");
     return res.blob();
+  }
+
+  // Phones only open the share sheet straight after a tap — awaiting a
+  // download inside the click handler loses that, and iOS refuses. So the
+  // photo file is fetched as soon as it's opened, ready before the tap.
+  function prepareShareFile(m) {
+    state.shareFile = null;
+    if (m.kind === "video" || !navigator.canShare) return;
+    fetchBlob(window.Insphoto.mediaUrl(m.storage_path))
+      .then((blob) => {
+        if (!state.media || state.media.id !== m.id) return;
+        const file = new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" });
+        if (navigator.canShare({ files: [file] })) state.shareFile = { id: m.id, file };
+      })
+      .catch(() => {});
   }
 
   async function shareCurrent() {
     if (!state.media) return;
     const url = window.Insphoto.mediaUrl(state.media.storage_path);
+    const ready = state.shareFile && state.shareFile.id === state.media.id ? state.shareFile.file : null;
     try {
-      if (navigator.canShare) {
-        const blob = await fetchBlob(url);
-        const file = new File([blob], "photo.jpg", { type: blob.type || "image/jpeg" });
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], text: state.media.caption || "" });
-          return;
-        }
-      }
-      if (navigator.share) {
-        await navigator.share({ url, text: state.media.caption || "" });
+      if (ready) {
+        await navigator.share({ files: [ready] });
         return;
       }
-      await navigator.clipboard.writeText(url);
-      window.InsphotoApp.toast("Link copied");
+      if (navigator.share) {
+        await navigator.share({ url });
+        return;
+      }
+      await copyLink(url);
     } catch (e) {
       if (e && e.name === "AbortError") return;
       console.error(e);
+      await copyLink(url);
+    }
+  }
+
+  async function copyLink(url) {
+    try {
+      await navigator.clipboard.writeText(url);
+      window.InsphotoApp.toast("Link copied");
+    } catch (e) {
+      window.InsphotoApp.toast("Sharing isn't available here — use Download");
     }
   }
 
@@ -209,7 +234,7 @@
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    });
+    }).catch(() => window.InsphotoApp.toast("Download failed — try again"));
   }
 
   function openDownloadSheet() {

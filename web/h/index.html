@@ -29,12 +29,12 @@
       </div>
       <nav class="ctabs">
         <button class="ctab active" data-tab="grid">Live Grid</button>
-        <button class="ctab" data-tab="contest">Best Dress</button>
-        <button class="ctab" data-tab="led">LED Control</button>
+        <button class="ctab" data-tab="console">Console</button>
         <button class="ctab" data-tab="setup">Event Setup</button>
       </nav>
       <span id="screenNow" class="screen-now"></span>
-      <button id="openScreenBtn" class="screen-btn" hidden title="Show the LED screen full screen on the second display">🖥 Open screen</button>
+      <button id="updateBtn" class="screen-btn update-btn" hidden title="A new version of the console app is available">⬆ Update</button>
+      <button id="openScreenBtn" class="screen-btn" hidden title="Show the LED screen full screen on the display chosen in the Console tab">🖥 Extend screen</button>
       <button id="panicBtn" class="panic-btn">⛔ PANIC</button>
     </header>
 
@@ -50,77 +50,85 @@
         <div id="grid" class="grid"></div>
       </section>
 
-      <section id="ctab-contest" class="ctab-panel">
-        <div class="contest">
-          <div class="contest-bar">
-            <div>
-              <h2>Best Dress</h2>
-              <p id="cPhase" class="phase-pill"></p>
-            </div>
-            <div class="contest-actions" id="cActions"></div>
-          </div>
-          <p id="cHelp" class="muted"></p>
-
-          <div class="contest-cols">
-            <div class="contest-col">
-              <h3 id="cRankTitle">Round 1 — most people liked</h3>
-              <ol id="cRanking" class="c-list"></ol>
-            </div>
-            <div class="contest-col">
-              <h3>Contestants on stage <span id="cCount" class="muted"></span></h3>
-              <ol id="cContestants" class="c-list"></ol>
-              <div id="cVoteBox" class="vote-box">
-                <label>Countdown
-                  <select id="cSeconds">
-                    <option value="0">No timer — stop by hand</option>
-                    <option value="30">30 seconds</option>
-                    <option value="60" selected>60 seconds</option>
-                    <option value="90">90 seconds</option>
-                    <option value="120">2 minutes</option>
-                    <option value="180">3 minutes</option>
-                  </select>
-                </label>
+      <section id="ctab-console" class="ctab-panel">
+        <div class="console-split">
+          <aside class="console-led">
+            <h2>Screen</h2>
+            <div class="led-controls">
+              <div class="scene-switch">
+                <button class="scene-btn" data-scene="wall" data-key="1">1 · Photo wall</button>
+                <button class="scene-btn" data-scene="ranking" data-key="2">2 · Ranking (top 9 photos)</button>
+                <button class="scene-btn" data-scene="contest" data-key="3">3 · Best Dress (contestants + numbers)</button>
+                <button class="scene-btn" data-scene="spotlight" data-key="4">4 · One photo (last one sent with 📺)</button>
+                <button class="scene-btn" data-scene="blank" data-key="6">6 · Blank</button>
               </div>
-              <div id="cLive" class="c-live"></div>
+              <div id="appScreenRow" class="led-row screen-pick" hidden>
+                <label for="displaySelect"><b>Project to</b></label>
+                <select id="displaySelect"></select>
+                <button id="displayRefresh" class="ghost" title="Look for displays again">↻</button>
+                <button id="openScreenBtn2">🖥 Extend screen</button>
+                <button id="closeScreenBtn" class="ghost">Close screen</button>
+              </div>
+              <div class="led-row">
+                <label><input id="featuredOnlyToggle" type="checkbox" /> <b>Featured only</b> — the wall shows only photos you ★ (no delay)</label>
+              </div>
+              <div class="led-row">
+                <label><input id="holdToggle" type="checkbox" /> Hold all (keep showing what's up, add nothing new)</label>
+              </div>
+              <div class="led-row">
+                <label for="delayInput">Delay before a guest photo can appear on the wall (seconds)</label>
+                <input id="delayInput" type="number" min="0" max="600" />
+                <button id="delaySave">Save</button>
+              </div>
+              <div id="spotPreview" class="spot-preview" hidden>
+                <p class="muted">On screen now (📺):</p>
+                <img id="spotPreviewImg" />
+                <button id="spotBack">Back to photo wall</button>
+              </div>
+              <p class="muted">Current scene: <strong id="currentScene">—</strong></p>
             </div>
-          </div>
-          <div class="contest-foot">
-            <button id="cLog">Download vote log (CSV)</button>
-            <button id="cReset" class="ghost">Reset contest (rehearsal only)</button>
-          </div>
-        </div>
-      </section>
-
-      <section id="ctab-led" class="ctab-panel">
-        <div class="led-controls">
-          <div class="scene-switch">
-            <button class="scene-btn" data-scene="wall" data-key="1">1 · Photo wall</button>
-            <button class="scene-btn" data-scene="ranking" data-key="2">2 · Ranking (top 9 photos)</button>
-            <button class="scene-btn" data-scene="contest" data-key="3">3 · Best Dress (contestants + numbers)</button>
-            <button class="scene-btn" data-scene="spotlight" data-key="4">4 · One photo (last one sent with 📺)</button>
-            <button class="scene-btn" data-scene="blank" data-key="6">6 · Blank</button>
-          </div>
-          <div id="appScreenRow" class="led-row" hidden>
-            <button id="openScreenBtn2">🖥 Open screen on second display</button>
-            <button id="closeScreenBtn" class="ghost">Close screen window</button>
-          </div>
-          <div class="led-row">
-            <label><input id="featuredOnlyToggle" type="checkbox" /> <b>Featured only</b> — the wall shows only photos you ★ (no delay)</label>
-          </div>
-          <div class="led-row">
-            <label><input id="holdToggle" type="checkbox" /> Hold all (keep showing what's up, add nothing new)</label>
-          </div>
-          <div class="led-row">
-            <label for="delayInput">Delay before a guest photo can appear on the wall (seconds)</label>
-            <input id="delayInput" type="number" min="0" max="600" />
-            <button id="delaySave">Save</button>
-          </div>
-          <div id="spotPreview" class="spot-preview" hidden>
-            <p class="muted">On screen now (📺):</p>
-            <img id="spotPreviewImg" />
-            <button id="spotBack">Back to photo wall</button>
-          </div>
-          <p class="muted">Current scene: <strong id="currentScene">—</strong></p>
+          </aside>
+          <div class="console-contest">
+            <div class="contest">
+              <div class="contest-bar">
+                <div>
+                  <h2>Best Dress</h2>
+                  <p id="cPhase" class="phase-pill"></p>
+                </div>
+                <div class="contest-actions" id="cActions"></div>
+              </div>
+              <p id="cHelp" class="muted"></p>
+    
+              <div class="contest-cols">
+                <div class="contest-col">
+                  <h3 id="cRankTitle">Round 1 — most people liked</h3>
+                  <ol id="cRanking" class="c-list"></ol>
+                </div>
+                <div class="contest-col">
+                  <h3>Contestants on stage <span id="cCount" class="muted"></span></h3>
+                  <ol id="cContestants" class="c-list"></ol>
+                  <div id="cVoteBox" class="vote-box">
+                    <label>Countdown
+                      <select id="cSeconds">
+                        <option value="10">10 seconds</option>
+                        <option value="20">20 seconds</option>
+                        <option value="30">30 seconds</option>
+                        <option value="60" selected>60 seconds</option>
+                        <option value="90">90 seconds</option>
+                        <option value="120">2 minutes</option>
+                        <option value="180">3 minutes</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div id="cLive" class="c-live"></div>
+                </div>
+              </div>
+              <div class="contest-foot">
+                <button id="cLog">Download vote log (CSV)</button>
+                <button id="cReset" class="ghost">Reset contest (rehearsal only)</button>
+              </div>
+            </div>
+              </div>
         </div>
       </section>
 
@@ -146,6 +154,13 @@
               <input id="photogPin" type="text" maxlength="20" placeholder="at least 4 characters" />
             </label>
             <button id="savePhotogPin">Set photographer PIN</button>
+          </div>
+
+          <div id="appCard" class="setup-card" hidden>
+            <h2>Console app</h2>
+            <p>Installed version: <strong id="appVersion">—</strong></p>
+            <p id="appUpdateText" class="muted">The console pages update by themselves. New app versions (screen window, updater) come from GitHub.</p>
+            <button id="checkUpdate">Check for updates</button>
           </div>
 
           <div class="setup-card">

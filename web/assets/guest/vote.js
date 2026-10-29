@@ -167,7 +167,13 @@
     const left = Math.max(0, Math.ceil((new Date(c.voting_ends_at).getTime() - serverNow()) / 1000));
     t.textContent = `${left}s`;
     t.classList.toggle("urgent", left <= 10);
-    if (left === 0) render();
+    if (left === 0 && state.countdownTimer) {
+      // Once, at zero: stop ticking and switch to the closed view. (Calling
+      // render() directly here looped forever — render() draws the timer.)
+      clearInterval(state.countdownTimer);
+      state.countdownTimer = null;
+      setTimeout(render, 0);
+    }
   }
 
   function render() {
@@ -175,6 +181,9 @@
     const pill = el("votePill");
     const open = isOpen();
     const finished = isFinished();
+    // The server still accepts taps for a moment after the cutoff — send
+    // the last batch right now instead of waiting for the usual timer.
+    if (finished && state.pending.size) flush();
 
     if (open) {
       el("voteMsg").textContent = "Tap a photo as many times as you like!";
@@ -185,13 +194,13 @@
       el("voteMsg").textContent = "Voting closed — thank you! Watch the screen for the winner.";
       view.classList.add("closed");
       pill.hidden = true;
-      flush();
     } else {
       view.hidden = true;
       pill.hidden = true;
     }
 
     clearInterval(state.countdownTimer);
+    state.countdownTimer = null;
     renderTimer();
     if (open && state.contest.voting_ends_at) {
       state.countdownTimer = setInterval(renderTimer, 250);

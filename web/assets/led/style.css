@@ -76,24 +76,33 @@ html, body {
 .wall-caption-text { font-size: 22px; color: #ddd; margin-top: 6px; }
 
 /* Ranking scene */
+/* All nine on one 1920x1080 screen: #1 large on the left, #2-#9 in a
+   4x2 grid beside it, clear of the QR card in the bottom-right corner. */
+#scene-ranking.active { display: flex; flex-direction: column; }
 .ranking-title {
   text-align: center;
   font-size: 44px;
-  margin: 30px 0 10px;
+  margin: 24px 0 14px;
 }
 .ranking-grid {
+  flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  padding: 0 40px;
+  grid-template-columns: 1.7fr repeat(4, 1fr);
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 0 220px 30px 40px;
 }
 .rank-tile {
   position: relative;
   border-radius: 16px;
   overflow: hidden;
-  aspect-ratio: 4/5;
+  min-height: 0;
   background: #111;
 }
+.rank-tile:first-child { grid-row: span 2; border: 4px solid #F59E0B; }
+.rank-tile:first-child .rank-num { width: 64px; height: 64px; font-size: 38px; }
+.rank-tile:first-child .rank-caption { font-size: 44px; padding: 12px 18px; gap: 32px; }
 .rank-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .rank-tile .rank-num {
   position: absolute;
@@ -106,13 +115,27 @@ html, body {
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
 }
+/* Frosted-glass bar: readable on any photo, light or dark. */
 .rank-tile .rank-caption {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  padding: 30px 12px 10px;
-  font-size: 28px;
-  font-weight: 700;
-  background: linear-gradient(to top, rgba(0,0,0,.85), transparent);
+  position: absolute; left: 10px; right: 10px; bottom: 10px;
+  display: flex; align-items: center; justify-content: center; gap: 22px;
+  padding: 8px 14px;
+  border-radius: 14px;
+  background: rgba(10, 10, 12, .45);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, .18);
+  font-size: 30px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0,0,0,.6);
 }
+.rank-stat { display: inline-flex; align-items: center; gap: 8px; }
+.rank-stat svg { width: 1em; height: 1em; fill: currentColor; flex: none; }
+.rank-heart { font-size: .9em; }
+.rank-people { color: #F59E0B; }
 
 /* Always-visible join card */
 .join-card {
@@ -236,5 +259,13 @@ html, body {
   font-size: 72px;
   filter: drop-shadow(0 4px 10px rgba(0,0,0,.6));
 }
+/* The pause after the cutoff while the last taps arrive: numbers and the
+   leader glow are hidden, then the final result flashes in. */
+.scene.contest.counting .c-count { filter: blur(18px); opacity: .5; animation: counting-pulse 1s ease-in-out infinite; }
+.scene.contest.counting .c-card.leader .c-photo { border-color: transparent; box-shadow: none; }
+.scene.contest.counting .c-card.leader .c-count { color: inherit; }
+@keyframes counting-pulse { 50% { opacity: .25; } }
+.scene.contest.final .c-count { animation: final-flash .8s ease-out; }
+@keyframes final-flash { 0% { transform: scale(1.5); color: #fff; text-shadow: 0 0 40px #F59E0B; } }
 .scene.contest.final .c-card:not(.winner) { opacity: .45; transform: scale(.94); }
 .scene.contest.final .c-card.winner { transform: scale(1.08); z-index: 2; }

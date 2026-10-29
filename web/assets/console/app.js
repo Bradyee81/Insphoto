@@ -416,35 +416,160 @@
 
   // ---------- desktop app: LED screen window ----------
   // Inside the InsPhoto Console desktop app (Tauri), the console can put
-  // the LED screen full screen on the second display. In a plain browser
-  // these buttons stay hidden and the screen is opened by its own link.
+  // the LED screen full screen on any connected display ("Extend screen"),
+  // picked from the list in the Console tab. In a plain browser these
+  // buttons stay hidden and the screen is opened by its own link.
 
   const tauri = window.__TAURI__ && window.__TAURI__.core;
+  const DISPLAY_KEY = "insphoto.console.display";
+
+  async function loadDisplays() {
+    const sel = document.getElementById("displaySelect");
+    let list = [];
+    try {
+      list = await tauri.invoke("list_displays");
+    } catch {
+      // App versions before 0.2 have no display list: they always pick the
+      // first display that isn't the console's.
+      sel.innerHTML = `<option value="">Second display</option>`;
+      return;
+    }
+    let saved = null;
+    try {
+      saved = localStorage.getItem(DISPLAY_KEY);
+    } catch {}
+    sel.innerHTML = "";
+    for (const d of list) {
+      const o = document.createElement("option");
+      o.value = String(d.index);
+      o.textContent = `Display ${d.index + 1} — ${d.width}×${d.height}${d.is_console ? " (this console)" : ""}`;
+      sel.appendChild(o);
+    }
+    const pick =
+      list.find((d) => String(d.index) === saved) || list.find((d) => !d.is_console) || list[0];
+    if (pick) sel.value = String(pick.index);
+  }
 
   async function openScreen() {
+    const v = document.getElementById("displaySelect").value;
     try {
-      toast(await tauri.invoke("open_screen", { slug: state.slug }));
+      localStorage.setItem(DISPLAY_KEY, v);
+    } catch {}
+    try {
+      const args = { slug: state.slug };
+      if (v !== "") args.display = Number(v);
+      toast(await tauri.invoke("open_screen", args));
+      setScreenOpen(true);
     } catch (e) {
       toast(`Could not open the screen: ${e}`);
     }
   }
 
   async function closeScreen() {
+    if (!confirm("Exit the screen?\n\nThe LED/projector will stop showing InsPhoto until you press Extend screen again.")) {
+      return;
+    }
     try {
       await tauri.invoke("close_screen");
-      toast("Screen window closed");
+      setScreenOpen(false);
+      toast("Screen closed");
     } catch (e) {
       toast(`Could not close the screen: ${e}`);
     }
   }
 
+  // The header button is Extend while no screen is up and Exit while one
+  // is. (After a console reload it starts as Extend: pressing it simply
+  // replaces the screen window that is already open.)
+  function setScreenOpen(open) {
+    state.screenOpen = open;
+    const btn = document.getElementById("openScreenBtn");
+    btn.textContent = open ? "✕ Exit screen" : "🖥 Extend screen";
+    btn.classList.toggle("exit", open);
+  }
+
+  // ---------- desktop app: updates ----------
+  // The console pages update themselves (they load from Cloudflare Pages);
+  // only the app shell needs a new installer now and then. Checked against
+  // the latest GitHub release once at start-up and on demand.
+
+  const RELEASES_API = "https://api.github.com/repos/Bradyee81/Insphoto/releases/latest";
+  const RELEASES_PAGE = "https://github.com/Bradyee81/Insphoto/releases/latest";
+
+  function newer(a, b) {
+    const pa = a.split(".").map(Number);
+    const pb = b.split(".").map(Number);
+    for (let i = 0; i < 3; i++) {
+      if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+    }
+    return false;
+  }
+
+  async function checkForUpdate(manual) {
+    const text = document.getElementById("appUpdateText");
+    let installed = "";
+    try {
+      installed = await window.__TAURI__.app.getVersion();
+    } catch {}
+    document.getElementById("appVersion").textContent = installed || "unknown";
+    try {
+      const res = await fetch(RELEASES_API, { cache: "no-store" });
+      if (!res.ok) throw new Error(String(res.status));
+      const rel = await res.json();
+      const latest = String(rel.tag_name || "").replace(/^console-v/, "");
+      const asset = (rel.assets || []).find((a) => /-setup\.exe$/i.test(a.name));
+      if (installed && latest && newer(latest, installed)) {
+        state.update = { version: latest, url: asset ? asset.browser_download_url : RELEASES_PAGE };
+        const btn = document.getElementById("updateBtn");
+        btn.hidden = false;
+        btn.textContent = `⬆ Update to ${latest}`;
+        text.textContent = `Version ${latest} is available.`;
+        if (manual) installUpdate();
+      } else {
+        state.update = null;
+        text.textContent = `You have the latest version${latest ? ` (${latest})` : ""}.`;
+        if (manual) toast("The console app is up to date");
+      }
+    } catch {
+      text.textContent = "Couldn't reach GitHub to check for updates.";
+      if (manual) toast("Couldn't check for updates — are you online?");
+    }
+  }
+
+  async function installUpdate() {
+    const u = state.update;
+    if (!u) return checkForUpdate(true);
+    if (
+      !confirm(
+        `Download InsPhoto Console ${u.version}?\n\nYour browser downloads the installer. Close this app, then run the installer — your event and sign-in are kept.\n\nDon't update in the middle of the event.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await tauri.invoke("open_download", { url: u.url });
+      toast("Downloading the installer — run it once it's done");
+    } catch {
+      // App versions before 0.2 can't open links: show where to get it.
+      prompt("Open this link in your browser to download the update:", u.url);
+    }
+  }
+
   function bindAppScreen() {
     if (!tauri) return;
+    document.getElementById("appCard").hidden = false;
+    document.getElementById("updateBtn").addEventListener("click", installUpdate);
+    document.getElementById("checkUpdate").addEventListener("click", () => checkForUpdate(true));
+    checkForUpdate(false);
     document.getElementById("openScreenBtn").hidden = false;
     document.getElementById("appScreenRow").hidden = false;
-    document.getElementById("openScreenBtn").addEventListener("click", openScreen);
+    document.getElementById("openScreenBtn").addEventListener("click", () =>
+      state.screenOpen ? closeScreen() : openScreen(),
+    );
     document.getElementById("openScreenBtn2").addEventListener("click", openScreen);
     document.getElementById("closeScreenBtn").addEventListener("click", closeScreen);
+    document.getElementById("displayRefresh").addEventListener("click", loadDisplays);
+    loadDisplays();
   }
 
   async function panic() {
@@ -639,7 +764,7 @@
       }
       refreshStats();
     }
-    if (window.InsphotoConsoleContest) window.InsphotoConsoleContest.onTab(name === "contest");
+    if (window.InsphotoConsoleContest) window.InsphotoConsoleContest.onTab(name === "console");
   }
 
   function moveFocus(delta) {

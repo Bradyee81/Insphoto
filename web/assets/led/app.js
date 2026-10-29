@@ -7,6 +7,9 @@
   const VIDEO_MAX_MS = 20000;
   const RANKING_REFRESH_MS = 15000;
   const CONTEST_POLL_MS = 1000;
+  // After the cutoff the server still takes in-flight taps for 2 s; the
+  // screen hides the numbers until they're all in, then reveals the final.
+  const CONTEST_REVEAL_MS = 3000;
   const CLOCK_SYNC_MS = 60000;
   const CACHE_LIMIT = 100;
   const RECONNECT_BASE_MS = 1000;
@@ -25,6 +28,7 @@
     rankingTimer: null,
     contestTimer: null,
     countdownTimer: null,
+    revealTimer: null,
     disconnectTimer: null,
     reconnectAttempt: 0,
     channel: null,
@@ -293,7 +297,10 @@
       tile.appendChild(num);
       const cap = document.createElement("div");
       cap.className = "rank-caption";
-      cap.textContent = window.InsphotoFormat.likeLabel(row.like_count, row.liker_count);
+      // Ranked by people, so that's the big number; likes underneath.
+      cap.innerHTML =
+        `<span class="rank-stat rank-people"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.5" r="4.5"/><path d="M3 22c0-5 4-8.5 9-8.5s9 3.5 9 8.5z"/></svg>${row.liker_count.toLocaleString("en-US")}</span>` +
+        `<span class="rank-stat rank-likes"><span class="rank-heart">❤️</span>${row.like_count.toLocaleString("en-US")}</span>`;
       tile.appendChild(cap);
       grid.appendChild(tile);
     });
@@ -328,13 +335,26 @@
     const scene = document.getElementById("scene-contest");
     const c = state.contest;
     const open = votingOpen(c);
-    const final = !!c && (c.phase === "closed" || (c.phase === "voting" && !open));
+    const ended = !!c && (c.phase === "closed" || (c.phase === "voting" && !open));
+    const cutoff = c && (c.voting_ends_at || c.voting_closed_at);
+    const counting = ended && !!cutoff && serverNow() < new Date(cutoff).getTime() + CONTEST_REVEAL_MS;
+    const final = ended && !counting;
+    scene.classList.toggle("counting", counting);
     scene.classList.toggle("final", final);
     status.textContent = open
       ? "Vote now — scan the QR and tap ❤️ on your favourite!"
-      : final
-        ? "Voting closed"
-        : "Voting opens soon";
+      : counting
+        ? "⏳ Counting the final likes…"
+        : final
+          ? "Voting closed"
+          : "Voting opens soon";
+    if (counting) {
+      clearTimeout(state.revealTimer);
+      state.revealTimer = setTimeout(
+        () => refreshContest(),
+        new Date(cutoff).getTime() + CONTEST_REVEAL_MS - serverNow() + 50,
+      );
+    }
   }
 
   function gridColumns(n) {

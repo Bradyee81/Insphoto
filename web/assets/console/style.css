@@ -128,6 +128,15 @@ main { padding: 16px; }
 .gstatus.hidden { background: #4b5563; }
 .gtile .gfeatured { position: absolute; top: 4px; right: 4px; font-size: 14px; }
 
+/* Console tab: screen controls on the left, Best Dress on the right. */
+.console-split { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 1000px) { .console-split { grid-template-columns: 1fr; } }
+.console-led { background: var(--surface); border-radius: 12px; padding: 14px; position: sticky; top: 0; }
+.console-led h2 { margin: 0 0 12px; font-size: 20px; }
+.console-led .scene-btn { background: var(--surface-2); }
+.screen-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.screen-pick label { flex-basis: 100%; }
+.screen-pick select { flex: 1 1 100%; min-width: 0; padding: 8px; border-radius: 8px; background: var(--surface-2); color: var(--text); border: 1px solid #2a2f36; }
 .led-controls { max-width: 560px; }
 .scene-switch { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 .scene-btn {
@@ -355,4 +364,6 @@ main { padding: 16px; }
   padding: 10px 14px;
   font-weight: 700;
 }
+.screen-btn.exit { background: var(--danger); border-color: var(--danger); color: #fff; }
+.screen-btn.update-btn { background: var(--accent); border-color: var(--accent); color: #1a1200; }
 .led-row button.ghost { background: var(--surface-2); color: var(--text-dim); }

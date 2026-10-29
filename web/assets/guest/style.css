@@ -11,6 +11,11 @@
 
 * { box-sizing: border-box; }
 
+/* Rapid taps on Like must not trigger the browser's double-tap zoom
+   (iOS ignores maximum-scale). Pinch-zoom and scrolling still work. */
+html, button { touch-action: manipulation; }
+button { -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+
 /* Several elements below (.photo-view, .sheet, .notice) set their own
    `display` for when they're shown, at the same specificity as the
    browser's built-in `[hidden] { display: none }` rule — so without this,
@@ -280,6 +285,8 @@ main { padding: 0 8px 90px; }
   font-weight: 600;
   min-height: 44px;
 }
+.pv-actions button { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.pv-icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .pv-like { background: #7f1d1d !important; }
 .pv-like.tapped { animation: heart-pop .25s ease; }
 @keyframes heart-pop { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
@@ -412,19 +419,22 @@ main { padding: 0 8px 90px; }
 .vote-grid {
   flex: 1;
   overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  /* One contestant per row, full width — big targets, nothing overlaps. */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   padding: 12px 12px calc(20px + env(safe-area-inset-bottom));
 }
 .v-card {
   position: relative;
+  flex: none;
+  width: 100%;
+  height: min(62vh, 125vw);
   padding: 0;
   border: 0;
   border-radius: 14px;
   overflow: hidden;
   background: var(--surface);
-  aspect-ratio: 3 / 4;
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
@@ -432,20 +442,20 @@ main { padding: 0 8px 90px; }
 .v-card img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .v-card .v-label {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  top: 10px;
+  left: 10px;
   background: rgba(0,0,0,.65);
   color: #fff;
   font-weight: 800;
-  font-size: 14px;
-  padding: 3px 10px;
+  font-size: 18px;
+  padding: 4px 12px;
   border-radius: 999px;
 }
 .v-card .v-heart {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  font-size: 30px;
+  right: 12px;
+  bottom: 10px;
+  font-size: 44px;
   filter: drop-shadow(0 2px 6px rgba(0,0,0,.6));
 }
 .v-card .v-mine {

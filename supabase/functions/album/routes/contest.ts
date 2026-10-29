@@ -134,6 +134,7 @@ const ACTIONS = new Set([
   "close_nominations",
   "reopen_nominations",
   "start_voting",
+  "start_countdown",
   "stop_voting",
   "reset",
 ]);

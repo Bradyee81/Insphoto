@@ -13,9 +13,12 @@ Run the installer — it installs for your user only, no admin rights needed. If
 Windows shows *"Windows protected your PC"*, click **More info → Run anyway**
 (the app isn't code-signed).
 
-On first launch, type your event code, then sign in with your host PIN. Press
-**🖥 Open screen** to put the big-screen view full screen on the second display.
-The app always loads the latest console, so it rarely needs reinstalling.
+On first launch, type your event code, then sign in with your host PIN. In the
+**Console** tab pick the display under **Project to**, then press
+**🖥 Extend screen** to put the big-screen view full screen on it; the same
+button becomes **✕ Exit screen** (with a confirmation). The app always loads
+the latest console pages; when a new app version is out, an **⬆ Update**
+button appears top right (also *Event Setup → Console app → Check for updates*).
 
 ## Who uses what
 
@@ -35,10 +38,11 @@ like photos, see the ranking, vote in the Best Dress final. No login, no app.
 at a time; each photo is in the album within seconds and its full-resolution
 original follows in the background. Re-dropping the same files skips them.
 
-**Console (host)**
+**Console (host)** — three tabs: Live Grid, Console (screen controls + Best Dress
+side by side), Event Setup
 - Live grid of every photo, filter by photographer / guests / featured
 - ★ **Feature** a photo, 📺 **show one photo on screen now**, hide, delete
-- Big-screen scenes: photo wall, ranking, Best Dress, one photo, blank
+- Big-screen scenes: photo wall, ranking (top 9 on one screen, people + likes), Best Dress, one photo, blank
 - **Featured only** mode — the wall shows only photos you star
 - **Panic**: press Esc twice to blank the screen
 - Photographer PIN, branding, upload/moderation switches, QR download
@@ -49,18 +53,21 @@ original follows in the background. Re-dropping the same files skips them.
    **how many people** liked each. The host can add votes as a safety net
    (shown only in the console) and picks the contestants. The emcee's cutoff =
    **Close nominations**, which freezes the ranking.
-2. *Round 2 (on stage)* — counting restarts at zero. Every phone opens the vote,
-   the screen shows the contestants with big live numbers and a countdown.
-   Up to 1,000 likes per phone per contestant. **STOP ALL LIKES** or the timer
-   ends it; the winner gets a crown. While voting is open the console cannot
-   change any numbers.
+2. *Round 2 (on stage)* — **Step 1 · Open final vote**: counting restarts at
+   zero, every phone opens the vote and the screen shows the contestants with
+   big live numbers. **Step 2 · Start countdown** when the emcee announces it
+   (10 s – 3 min); likes keep counting until zero, then voting locks. Up to
+   1,000 likes per phone per contestant. **STOP ALL LIKES** ends it early. The
+   screen shows "Counting the final likes…" for a few seconds so last-second
+   taps are in, then reveals the final numbers and crowns the winner. While
+   voting is open the console cannot change any numbers.
 3. Every step is recorded — download the log as a CSV.
 
 ## Before an event
 
 1. Console → **Event Setup**: set the photographer PIN, check branding, download the QR.
 2. Rehearse once on real phones and the real screen (upload, feature, show on
-   screen, a 30-second Best Dress round, then **Reset contest**).
+   screen, a Best Dress round with a 30-second countdown, then **Reset contest**).
 3. Screen PC/laptop: turn off sleep and Windows updates, keep the clock on
    automatic time, have a phone hotspot as backup.
 
@@ -83,3 +90,4 @@ go live through Cloudflare Pages without a new app.
 1. Bump `version` in `console-app/package.json` and `console-app/src-tauri/Cargo.toml`.
 2. Commit, push, then push a tag: `git tag console-v0.2.0 && git push origin console-v0.2.0`.
 3. GitHub Actions builds the installer and publishes the release (about 10 minutes).
+   Installed apps then show **⬆ Update** at their next start.
